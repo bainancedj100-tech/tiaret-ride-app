@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
-import { Car, Package, MapPin, Search, Navigation, Loader2 } from 'lucide-react';
+import { Car, Package, MapPin, Search, Navigation, Loader2, ShieldAlert, BadgeCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Map from './Map';
 import { calculatePrice } from '../utils/pricing';
 import ActiveRide from './ActiveRide';
 import Invoice from './Invoice';
+import { collection, addDoc, onSnapshot, doc } from 'firebase/firestore';
+import { db } from '../firebase/config';
 
 const Home = () => {
+  const navigate = useNavigate();
   const [serviceType, setServiceType] = useState('ride'); // 'ride' or 'delivery'
   const [destination, setDestination] = useState(null);
   const [price, setPrice] = useState(0);
+  const [currentOrderId, setCurrentOrderId] = useState(null);
   
   // flow: 'idle' -> 'finding' -> 'active' -> 'invoice'
   const [orderStatus, setOrderStatus] = useState('idle'); 
@@ -20,22 +25,64 @@ const Home = () => {
     setPrice(calculated);
   };
 
-  const handleRequest = () => {
+  const handleRequest = async () => {
+    if (!destination || price === 0) return;
     setOrderStatus('finding');
-    // Simulate finding driver
-    setTimeout(() => {
-      setOrderStatus('active');
-    }, 3000);
+    
+    try {
+      // 1. Create order in Firebase
+      const docRef = await addDoc(collection(db, 'orders'), {
+        serviceType,
+        destination,
+        price,
+        status: 'finding',
+        createdAt: new Date().toISOString(),
+        customerInfo: 'Guest User' // Placeholder since we don't have customer auth yet
+      });
+      setCurrentOrderId(docRef.id);
+
+      // 2. Listen to this specific order for driver acceptance
+      const unsub = onSnapshot(doc(db, 'orders', docRef.id), (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.status === 'active') {
+            setOrderStatus('active');
+            unsub(); // Stop listening once active to avoid multiple triggers, handle completion differently or keep listening
+          } else if (data.status === 'completed') {
+            setOrderStatus('invoice');
+            unsub();
+          } else if (data.status === 'cancelled') {
+            setOrderStatus('idle');
+            setCurrentOrderId(null);
+            alert("Ride was cancelled.");
+            unsub();
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Error creating order: ", error);
+      alert("Failed to request ride. Please try again.");
+      setOrderStatus('idle');
+    }
   };
 
-  const handleCompleteRide = () => {
-    setOrderStatus('invoice');
+  const handleCompleteRide = async () => {
+    // Note: In a real app, the driver app would trigger this completion.
+    // We are simulating it here for the UI flow of the passenger.
+    if (currentOrderId) {
+      // We don't necessarily update Firebase here if the driver is supposed to do it,
+      // but for simulation, we'll just move to invoice state visually.
+      setOrderStatus('invoice');
+    } else {
+      setOrderStatus('invoice');
+    }
   };
 
   const handleCloseInvoice = () => {
     setOrderStatus('idle');
     setDestination(null);
     setPrice(0);
+    setCurrentOrderId(null);
   };
 
   return (
@@ -43,9 +90,27 @@ const Home = () => {
       {/* Background Interactive Map */}
       <Map onMapClick={handleMapClick} destination={destination} />
 
+      {/* Floating Action Buttons */}
+      {orderStatus === 'idle' && (
+        <div className="absolute top-4 right-4 z-20 flex flex-col gap-3 items-end">
+          <button 
+            onClick={() => navigate('/driver/register')}
+            className="glass px-4 py-2 rounded-full shadow-lg border border-white flex items-center gap-2 hover:bg-white/80 transition-colors text-gray-800 font-bold text-sm"
+          >
+            سجل كشريك سائق <BadgeCheck className="w-4 h-4 text-brand" />
+          </button>
+          <button 
+            onClick={() => navigate('/admin')}
+            className="glass px-4 py-2 rounded-full shadow-lg border border-white flex items-center gap-2 hover:bg-white/80 transition-colors text-gray-800 font-bold text-sm"
+          >
+            لوحة الإدارة <ShieldAlert className="w-4 h-4 text-red-500" />
+          </button>
+        </div>
+      )}
+
       {/* Top Search Bar Array (Hidden during active ride/invoice) */}
       {orderStatus === 'idle' && (
-        <div className="absolute top-6 left-4 right-4 z-10 flex flex-col gap-3">
+        <div className="absolute top-20 left-4 right-4 z-10 flex flex-col gap-3">
           {/* Glassmorphism User Current Location */}
           <div className="glass rounded-full px-4 py-3 flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center">
@@ -67,7 +132,7 @@ const Home = () => {
             </div>
             <input 
               type="text" 
-              placeholder={destination ? "Destination selected on map" : "Tap map to set destination..."}
+              placeholder={destination ? "تم تحديد الوجهة على الخريطة" : "أين وجهتك؟"}
               className="bg-transparent border-none outline-none flex-1 font-medium text-gray-800 placeholder-gray-500 text-sm"
               readOnly
             />
@@ -96,7 +161,7 @@ const Home = () => {
               <Car className="w-8 h-8" />
             </div>
             <span className={`font-semibold ${serviceType === 'ride' ? 'text-brand' : 'text-gray-700'}`}>
-              Ride
+              طلب رحلة
             </span>
           </button>
 
@@ -113,7 +178,7 @@ const Home = () => {
               <Package className="w-8 h-8" />
             </div>
             <span className={`font-semibold ${serviceType === 'delivery' ? 'text-orange-600' : 'text-gray-700'}`}>
-              Delivery
+              خدمة توصيل
             </span>
           </button>
         </div>
@@ -135,15 +200,23 @@ const Home = () => {
           </div>
         )}
 
-        {/* Action Button */}
-        <button 
-          onClick={handleRequest}
-          className="w-full mt-5 bg-gray-900 hover:bg-black disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl shadow-lg transition-colors flex items-center justify-center gap-2"
-          disabled={!destination}
-        >
-          {serviceType === 'ride' ? 'Request Ride' : 'Request Delivery'}
-          {destination && <Navigation className="w-5 h-5 ml-1" />}
-        </button>
+        {/* Action Buttons */}
+        <div className="flex flex-col gap-3 mt-5">
+          <button 
+            onClick={() => navigate('/driver/register')}
+            className="w-full bg-brand-light hover:bg-brand text-white font-bold py-3 text-lg rounded-2xl shadow-md transition-colors flex items-center justify-center gap-2"
+          >
+            سجل كشريك سائق <BadgeCheck className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={handleRequest}
+            className="w-full bg-gray-900 hover:bg-black disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl shadow-lg transition-colors flex items-center justify-center gap-2"
+            disabled={!destination}
+          >
+            {serviceType === 'ride' ? 'طلب رحلة' : 'تأكيد خدمة التوصيل'}
+            {destination && <Navigation className="w-5 h-5 ml-1" />}
+          </button>
+        </div>
       </div>
       )}
 

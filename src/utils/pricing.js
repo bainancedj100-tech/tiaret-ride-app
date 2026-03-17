@@ -31,9 +31,7 @@ const deg2rad = (deg) => {
 
 /**
  * Calculates the price for a ride or delivery based on the destination.
- * Rules:
- * 1. Inside Tiaret bounds (< 5km from center): 100 DA
- * 2. Outside Tiaret bounds: 100 DA + 50 DA per extra km
+ * Algorithm: Total Fare = Base Fare + (Distance * Rate per KM)
  * 
  * @param {Object} destination - {lat, lng}
  * @returns {number} Price in DA
@@ -48,13 +46,9 @@ export const calculatePrice = (destination) => {
     destination.lng
   );
 
-  if (distanceToCenter <= RADIUS_KM) {
-    return BASE_FARE_DA;
-  } else {
-    // Calculate extra distance beyond the 5km radius
-    const extraDistance = distanceToCenter - RADIUS_KM;
-    // Calculate additional fare (rounded to nearest 10 DA for cleaner numbers, or exact)
-    const extraFare = extraDistance * FARE_PER_KM_OUTSIDE_DA;
-    return Math.round(BASE_FARE_DA + extraFare);
-  }
+  // Calculate fare based strictly on the required algorithm
+  const totalFare = BASE_FARE_DA + (distanceToCenter * FARE_PER_KM_OUTSIDE_DA);
+  
+  // Round to nearest whole number for cleaner UI
+  return Math.round(totalFare);
 };

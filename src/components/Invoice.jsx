@@ -1,7 +1,32 @@
-import React from 'react';
-import { BadgeCheck, MapPin, Navigation } from 'lucide-react';
+import React, { useState } from 'react';
+import { BadgeCheck, MapPin, Navigation, Star } from 'lucide-react';
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from '../firebase/config';
 
 const Invoice = ({ price, serviceType, destination, onClose }) => {
+  const [rating, setRating] = useState(0);
+  const [feedback, setFeedback] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmitFeedback = async () => {
+    try {
+      setIsSubmitting(true);
+      await addDoc(collection(db, 'feedbacks'), {
+        rating,
+        feedback,
+        serviceType,
+        destination,
+        price,
+        timestamp: new Date().toISOString()
+      });
+      onClose();
+    } catch (err) {
+      console.error("Error submitting feedback:", err);
+      // Still close even if error during beta
+      onClose();
+    }
+  };
+
   return (
     <div className="absolute inset-0 z-50 glass-dark flex flex-col items-center justify-center px-6 animate-in fade-in duration-300">
       
@@ -44,11 +69,38 @@ const Invoice = ({ price, serviceType, destination, onClose }) => {
             </div>
           </div>
 
+          <div className="border-t border-gray-100 pt-6 mb-8">
+            <p className="text-center text-sm font-bold text-gray-700 mb-3">Rate your experience</p>
+            <div className="flex justify-center gap-2 mb-4">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button 
+                  key={star}
+                  onClick={() => setRating(star)}
+                  className="transition-transform hover:scale-110 active:scale-90"
+                >
+                  <Star 
+                    className={`w-8 h-8 ${rating >= star ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} 
+                  />
+                </button>
+              ))}
+            </div>
+            
+            {rating > 0 && (
+              <textarea 
+                placeholder="Any comments to help us improve in Tiaret?" 
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-brand transition-colors resize-none h-20"
+              />
+            )}
+          </div>
+
           <button 
-            onClick={onClose}
+            onClick={rating > 0 ? handleSubmitFeedback : onClose}
+            disabled={isSubmitting}
             className="w-full bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl shadow-md transition-colors"
           >
-            Done
+            {isSubmitting ? 'Sumitting...' : (rating > 0 ? 'Submit Feedback' : 'Done')}
           </button>
         </div>
       </div>
