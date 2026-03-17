@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/tiaret-ride-app/sw.js', { scope: '/tiaret-ride-app/' })})}
