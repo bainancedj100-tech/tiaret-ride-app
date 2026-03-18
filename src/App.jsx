@@ -10,20 +10,25 @@ import AdminGuard from './components/AdminGuard';
 function App() {
   return (
     <Router>
-      <AuthGate>
-        <div className="w-full h-screen relative bg-gray-100 font-sans">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/driver/register" element={<DriverRegistration />} />
-            <Route path="/driver/dashboard" element={<DriverDashboard />} />
-            <Route path="/admin" element={
-              <AdminGuard>
-                <AdminDashboard />
-              </AdminGuard>
-            } />
-          </Routes>
-        </div>
-      </AuthGate>
+      <div className="w-full h-screen relative overflow-hidden" style={{ background: '#0a0f1e' }}>
+        <Routes>
+          {/* Admin — PIN protected, no user auth needed */}
+          <Route path="/admin" element={
+            <AdminGuard><AdminDashboard /></AdminGuard>
+          } />
+
+          {/* Driver routes */}
+          <Route path="/driver/register" element={<DriverRegistration />} />
+          <Route path="/driver/dashboard" element={<DriverDashboard />} />
+
+          {/* All other routes → AuthGate → Rider Home */}
+          <Route path="/*" element={
+            <AuthGate>
+              <Home />
+            </AuthGate>
+          } />
+        </Routes>
+      </div>
     </Router>
   );
 }

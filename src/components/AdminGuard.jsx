@@ -6,8 +6,6 @@ const AdminGuard = ({ children }) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
 
-  // In a real app, this would be a secure backend check.
-  // For this beta, a simple frontend PIN is used as requested.
   const CORRECT_PIN = '1234';
 
   const handleSubmit = (e) => {
@@ -21,47 +19,32 @@ const AdminGuard = ({ children }) => {
     }
   };
 
-  if (isAuthenticated) {
-    return children;
-  }
+  if (isAuthenticated) return children;
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4 font-sans">
-      <div className="max-w-sm w-full bg-white p-8 rounded-[32px] shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-2 bg-brand"></div>
-        
-        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <ShieldCheck className="w-10 h-10 text-gray-800" />
+    <div className="min-h-screen bg-dark flex items-center justify-center p-4 font-sans" dir="rtl">
+      <div className="absolute -top-32 -right-32 w-96 h-96 bg-red-500/10 rounded-full blur-3xl" />
+      <div className="glass-card w-full max-w-sm p-8 rounded-3xl relative z-10">
+        <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6">
+          <ShieldCheck className="w-10 h-10 text-brand" />
         </div>
-        
-        <h2 className="text-2xl font-black text-center text-gray-900 mb-2">Admin Access</h2>
-        <p className="text-gray-500 text-center font-medium mb-8">Enter the security PIN to access the dashboard.</p>
-        
+        <h2 className="text-2xl font-black text-center text-white mb-1">لوحة الإدارة</h2>
+        <p className="text-white/50 text-center text-sm mb-8">أدخل رمز الدخول السري للمتابعة</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative">
-            <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input 
-              type="password" 
-              placeholder="Enter PIN" 
+            <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
+            <input
+              type="password"
+              placeholder="رمز الدخول"
               value={pin}
-              onChange={(e) => {
-                setPin(e.target.value);
-                setError(false);
-              }}
-              className={`w-full pl-12 pr-4 py-4 bg-gray-50 border ${error ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-brand'} rounded-xl outline-none transition-colors font-bold text-lg tracking-widest text-center`}
+              onChange={e => { setPin(e.target.value); setError(false); }}
+              className={`input-ar pl-12 text-center tracking-widest text-xl ${error ? 'border-red-500/60' : ''}`}
               autoFocus
               maxLength={4}
             />
           </div>
-          
-          {error && <p className="text-red-500 text-sm font-bold text-center">Incorrect PIN. Try again.</p>}
-          
-          <button 
-            type="submit"
-            className="w-full bg-brand hover:bg-brand-dark text-white font-black py-4 rounded-xl shadow-lg transition-colors flex items-center justify-center gap-2"
-          >
-            Unlock Dashboard
-          </button>
+          {error && <p className="text-red-400 text-sm font-bold text-center">رمز غير صحيح. حاول مجدداً.</p>}
+          <button type="submit" className="btn-primary w-full">دخول</button>
         </form>
       </div>
     </div>
