@@ -80,8 +80,36 @@
   }
 }
 
-/* Leaflet map */
-.leaflet-container { width: 100%; height: 100%; z-index: 0; }
+/* ── Leaflet map ─────────────────────────────────────────────────────── */
+.leaflet-container {
+  width: 100%; height: 100%; z-index: 0;
+  /* Google Maps-like: white + subtle cool blue tint */
+  filter: hue-rotate(200deg) saturate(0.7) brightness(1.15) contrast(1.1);
+}
+
+/* Google Maps style tooltip */
+.gmaps-tooltip {
+  background: white !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.22) !important;
+  font-size: 11px !important;
+  font-family: 'Cairo', sans-serif !important;
+  padding: 2px 7px !important;
+  border-radius: 4px !important;
+  font-weight: 600 !important;
+  color: #1a1a2e !important;
+  white-space: nowrap !important;
+}
+/* Remove the default tooltip arrow */
+.gmaps-tooltip::before { display: none !important; }
+
+/* LayersControl RTL friendly */
+.leaflet-control-layers {
+  direction: rtl;
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
 
 /* Animate helpers */
 @keyframes slide-up {
@@ -95,4 +123,3 @@
   to   { opacity: 1; transform: scale(1); }
 }
 .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
-
