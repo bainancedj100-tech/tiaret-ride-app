@@ -4,16 +4,17 @@ export const TIARET_CENTER = {
   lng: 1.3204
 };
 
-export const RADIUS_KM = 5;
-export const BASE_FARE_DA = 100;
-export const FARE_PER_KM_OUTSIDE_DA = 50;
+// Municipality boundary radius in km (approximate)
+export const MUNICIPALITY_RADIUS_KM = 5;
+export const BASE_FARE_DA = 100;           // flat fare inside the municipality
+export const FARE_PER_KM_OUTSIDE_DA = 50; // per extra km beyond the boundary
 
 /**
  * Calculates straight-line distance between two points in kilometers
  * using the Haversine formula.
  */
 export const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
-  const R = 6371; // Radius of the earth in km
+  const R = 6371;
   const dLat = deg2rad(lat2 - lat1);
   const dLon = deg2rad(lon2 - lon1);
   const a =
@@ -21,34 +22,38 @@ export const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
     Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const d = R * c; // Distance in km
-  return d;
+  return R * c;
 };
 
-const deg2rad = (deg) => {
-  return deg * (Math.PI / 180);
-};
+const deg2rad = (deg) => deg * (Math.PI / 180);
 
 /**
- * Calculates the price for a ride or delivery based on the destination.
- * Algorithm: Total Fare = Base Fare + (Distance * Rate per KM)
+ * Calculates ride price.
  * 
- * @param {Object} destination - {lat, lng}
- * @returns {number} Price in DA
+ * Rules:
+ *  - Inside Tiaret municipality (≤ MUNICIPALITY_RADIUS_KM from center): flat 100 DA
+ *  - Outside: 100 DA + 50 DA × (distance_to_center − MUNICIPALITY_RADIUS_KM)
+ *
+ * @param {Object} destination - { lat, lng }
+ * @returns {number} Price in DA (rounded)
  */
 export const calculatePrice = (destination) => {
   if (!destination || !destination.lat || !destination.lng) return 0;
 
   const distanceToCenter = calculateDistanceKm(
-    TIARET_CENTER.lat, 
-    TIARET_CENTER.lng, 
-    destination.lat, 
+    TIARET_CENTER.lat,
+    TIARET_CENTER.lng,
+    destination.lat,
     destination.lng
   );
 
-  // Calculate fare based strictly on the required algorithm
-  const totalFare = BASE_FARE_DA + (distanceToCenter * FARE_PER_KM_OUTSIDE_DA);
-  
-  // Round to nearest whole number for cleaner UI
+  if (distanceToCenter <= MUNICIPALITY_RADIUS_KM) {
+    // Inside the municipality → flat fare
+    return BASE_FARE_DA;
+  }
+
+  // Outside the municipality → flat fare + extra per km beyond the boundary
+  const extraKm = distanceToCenter - MUNICIPALITY_RADIUS_KM;
+  const totalFare = BASE_FARE_DA + extraKm * FARE_PER_KM_OUTSIDE_DA;
   return Math.round(totalFare);
 };
