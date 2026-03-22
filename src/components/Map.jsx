@@ -16,61 +16,62 @@ L.Icon.Default.mergeOptions({
 
 // ── Emoji divIcons ──────────────────────────────────────────────────────────
 const makeEmoji = (emoji, size = 22) => L.divIcon({
-  html: `<span style="font-size:${size}px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35))">${emoji}</span>`,
-  className: '',
+  html: `<span style="font-size:${size}px;line-height:1;display:block;text-align:center;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.4))">${emoji}</span>`,
+  className: 'custom-icon',
   iconSize:   [size, size],
   iconAnchor: [size / 2, size / 2],
-  popupAnchor:[0, -size / 2],
+  popupAnchor:[0, -(size / 2 + 4)],
 });
 
 const ICONS = {
-  neighborhood: makeEmoji('🏘️', 20),
+  neighborhood: makeEmoji('📍', 20),
   admin:        makeEmoji('🏛️', 22),
   highschool:   makeEmoji('📚', 20),
   primary:      makeEmoji('📖', 20),
   mosque:       makeEmoji('🕌', 22),
-  driver:       makeEmoji('🚗', 22),
-  user:         makeEmoji('📍', 26),
+  driver:       makeEmoji('🚗', 24),
+  user:         makeEmoji('🔵', 20),
   destination:  makeEmoji('🎯', 26),
 };
 
 // ── Landmark Data ────────────────────────────────────────────────────────────
 const NEIGHBORHOODS = [
   { name: 'حي 500 سكن التفاح',       lat: 35.3685, lng: 1.3250 },
-  { name: 'حي الإخوة قيطون (لاسيا)', lat: 35.3700, lng: 1.3100 },
+  { name: 'حي لاسيا (الإخوة قيطون)', lat: 35.3700, lng: 1.3100 },
   { name: 'حي سيدي خالد',            lat: 35.3650, lng: 1.3300 },
   { name: 'حي ديار الشمس',           lat: 35.3720, lng: 1.3180 },
   { name: 'حي الجامعة',              lat: 35.3670, lng: 1.3220 },
   { name: 'حي كارمان',               lat: 35.3690, lng: 1.3150 },
   { name: 'حي 700 سكن',              lat: 35.3735, lng: 1.3125 },
+  { name: 'حي السنيا',               lat: 35.3750, lng: 1.3200 },
+  { name: 'حي الأتراك',              lat: 35.3715, lng: 1.3165 },
+  { name: 'حي قايد أحمد',            lat: 35.3660, lng: 1.3290 },
+  { name: 'حي عين مصباح',            lat: 35.3680, lng: 1.3280 },
+  { name: 'حي واد الطلبة',           lat: 35.3725, lng: 1.3140 },
+  { name: 'حي الرودوت',              lat: 35.3705, lng: 1.3160 },
   { name: 'حي التفاح',               lat: 35.3700, lng: 1.3320 },
   { name: 'حي سوناطيبا',             lat: 35.3620, lng: 1.3350 },
-  { name: 'حي زعرورة',               lat: 35.3421, lng: 1.3131 },
-  { name: 'حي واد الطلبة',           lat: 35.3529, lng: 1.3112 },
   { name: 'حي البدر',                lat: 35.3532, lng: 1.3275 },
   { name: 'حي 405 مسكن',             lat: 35.3759, lng: 1.3305 },
   { name: 'حي تيتانيك',              lat: 35.3650, lng: 1.3400 },
   { name: 'حي لاقلاسيار',            lat: 35.3851, lng: 1.3149 },
-  { name: 'حي قيطون',                lat: 35.3800, lng: 1.3200 },
-  { name: 'حي محمد جاهلان',          lat: 35.3580, lng: 1.3250 },
   { name: 'حي 293 مسكن',             lat: 35.3860, lng: 1.3120 },
   { name: 'حي الصنوبر',              lat: 35.3820, lng: 1.3080 },
 ];
 
 const ADMIN = [
-  { name: 'مقر الولاية تيارت',                lat: 35.3710, lng: 1.3170 },
-  { name: 'مستشفى يوسف دمردجي',               lat: 35.3839, lng: 1.3147 },
-  { name: 'ملعب أحمد قايد',                   lat: 35.3619, lng: 1.3312 },
-  { name: 'مستشفى كرمان تيارت',               lat: 35.3680, lng: 1.3500 },
-  { name: 'مستشفى الأمومة والطفولة',           lat: 35.3500, lng: 1.3300 },
-  { name: 'المعهد الوطني INFSPM',              lat: 35.3840, lng: 1.3150 },
-  { name: 'جامعة ابن خلدون',                  lat: 35.3400, lng: 1.3100 },
-  { name: 'القطب الجامعي',                    lat: 35.3550, lng: 1.3200 },
-  { name: 'بارك التسلية',                     lat: 35.3850, lng: 1.3100 },
-  { name: 'حديقة رستم',                       lat: 35.3830, lng: 1.3050 },
-  { name: 'غابة سيدي محمد',                   lat: 35.3700, lng: 1.2900 },
-  { name: 'محطة المسافرين البرية',             lat: 35.3600, lng: 1.3150 },
-  { name: 'فندق بوعزة',                       lat: 35.3650, lng: 1.3200 },
+  { name: 'مقر الولاية تيارت',            lat: 35.3710, lng: 1.3170 },
+  { name: 'مستشفى يوسف دمردجي',           lat: 35.3839, lng: 1.3147 },
+  { name: 'ملعب أحمد قايد',               lat: 35.3619, lng: 1.3312 },
+  { name: 'جامعة تيارت ابن خلدون',        lat: 35.3680, lng: 1.3195 },
+  { name: 'مستشفى كرمان',                 lat: 35.3680, lng: 1.3500 },
+  { name: 'مستشفى الأمومة والطفولة',       lat: 35.3500, lng: 1.3300 },
+  { name: 'المعهد الوطني INFSPM',          lat: 35.3840, lng: 1.3150 },
+  { name: 'محطة المسافرين البرية',         lat: 35.3600, lng: 1.3150 },
+  { name: 'بارك التسلية',                 lat: 35.3850, lng: 1.3100 },
+  { name: 'حديقة رستم',                   lat: 35.3830, lng: 1.3050 },
+  { name: 'غابة سيدي محمد',               lat: 35.3700, lng: 1.2900 },
+  { name: 'فندق بوعزة',                   lat: 35.3650, lng: 1.3200 },
 ];
 
 const HIGHSCHOOLS = [
@@ -79,39 +80,47 @@ const HIGHSCHOOLS = [
   { name: 'ثانوية ابن رستم',         lat: 35.3650, lng: 1.3180 },
   { name: 'ثانوية كرمان الجديدة',    lat: 35.3725, lng: 1.3160 },
   { name: 'ثانوية قاديري خالد',      lat: 35.3680, lng: 1.3190 },
+  { name: 'ثانوية باقي الطيب',       lat: 35.3710, lng: 1.3100 },
+  { name: 'ثانوية عماري عبد القادر', lat: 35.3695, lng: 1.3110 },
+  { name: 'ثانوية عفان الطاهر',      lat: 35.3730, lng: 1.3130 },
+  { name: 'ثانوية حيرش محمد',        lat: 35.3700, lng: 1.3250 },
+  { name: 'ثانوية زايش عبد القادر',  lat: 35.3670, lng: 1.3250 },
 ];
 
 const PRIMARYSCHOOLS = [
-  { name: 'ابتدائية بن فريحة أمحمد',     lat: 35.3675, lng: 1.3120 },
+  { name: 'ابتدائية بن فريحة أمحمد',    lat: 35.3675, lng: 1.3120 },
   { name: 'ابتدائية الإمام عبد الوهاب', lat: 35.3725, lng: 1.3185 },
   { name: 'ابتدائية بن ستيرة جيلالي',   lat: 35.3750, lng: 1.3200 },
-  { name: 'ابتدائية عيسات بن عودة',     lat: 35.3685, lng: 1.3250 },
+  { name: 'ابتدائية كاتبي أمحمد',       lat: 35.3690, lng: 1.3175 },
+  { name: 'ابتدائية السنيا الجديدة',    lat: 35.3740, lng: 1.3210 },
+  { name: 'ابتدائية سيدي خالد',         lat: 35.3645, lng: 1.3290 },
+  { name: 'ابتدائية ديار الشمس',        lat: 35.3718, lng: 1.3178 },
+  { name: 'ابتدائية حي كارمان',         lat: 35.3688, lng: 1.3145 },
 ];
 
 const MOSQUES = [
   { name: 'جامع تيارت الكبير',          lat: 35.3700, lng: 1.3160 },
-  { name: 'مسجد صلاح الدين الأيوبي',   lat: 35.3680, lng: 1.3190 },
   { name: 'مسجد الرحمة',               lat: 35.3695, lng: 1.3145 },
   { name: 'مسجد الأرقم بن أبي الأرقم', lat: 35.3715, lng: 1.3130 },
-  { name: 'مسجد الهدى (حي واد)',        lat: 35.3665, lng: 1.3280 },
+  { name: 'مسجد صلاح الدين الأيوبي',   lat: 35.3680, lng: 1.3190 },
+  { name: 'مسجد البدر',                lat: 35.3708, lng: 1.3172 },
+  { name: 'مسجد سيدي خالد',            lat: 35.3655, lng: 1.3285 },
+  { name: 'مسجد الهدى',               lat: 35.3665, lng: 1.3280 },
 ];
 
-// ── Landmark Marker (tooltip visible only at zoom ≥ 15) ─────────────────────
-function LandmarkMarker({ pos, name, icon }) {
-  const [show, setShow] = useState(false);
+// ── Zoom tracker ─────────────────────────────────────────────────────────────
+function ZoomTracker({ onZoom }) {
+  const map = useMap();
+  useEffect(() => { onZoom(map.getZoom()); }, []);
+  useMapEvents({ zoomend: (e) => onZoom(e.target.getZoom()) });
+  return null;
+}
 
-  function Inner() {
-    useMapEvents({
-      zoomend: (e) => setShow(e.target.getZoom() >= 15),
-      load:    (e) => setShow(e.target.getZoom() >= 15),
-    });
-    return null;
-  }
-
+// ── Landmark Marker (tooltip only at zoom ≥ 15) ──────────────────────────────
+function LandmarkMarker({ pos, name, icon, zoom }) {
   return (
     <Marker position={pos} icon={icon}>
-      <Inner />
-      {show && (
+      {zoom >= 15 && (
         <Tooltip
           permanent
           direction="top"
@@ -122,7 +131,7 @@ function LandmarkMarker({ pos, name, icon }) {
         </Tooltip>
       )}
       <Popup>
-        <div style={{ direction: 'rtl', fontFamily: 'sans-serif', fontWeight: 600 }}>
+        <div style={{ direction: 'rtl', fontFamily: "'Cairo', sans-serif", fontWeight: 600, fontSize: 13 }}>
           {name}
         </div>
       </Popup>
@@ -131,9 +140,9 @@ function LandmarkMarker({ pos, name, icon }) {
 }
 
 // ── Sub-components ───────────────────────────────────────────────────────────
-function ChangeView({ center, zoom }) {
+function ChangeView({ center }) {
   const map = useMap();
-  map.setView(center, zoom);
+  useEffect(() => { map.setView(center, map.getZoom()); }, [center]);
   return null;
 }
 
@@ -146,12 +155,13 @@ function MapClickEvents({ onClick }) {
 const Map = ({ onMapClick, destination }) => {
   const [position, setPosition] = useState([35.371, 1.317]);
   const [drivers, setDrivers]   = useState([]);
+  const [zoom, setZoom]         = useState(14);
 
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => setPosition([pos.coords.latitude, pos.coords.longitude]),
-        ()    => console.warn('Geolocation unavailable')
+        ()    => console.warn('Geolocation unavailable, using Tiaret center')
       );
     }
     try {
@@ -167,88 +177,71 @@ const Map = ({ onMapClick, destination }) => {
       <MapContainer
         center={position}
         zoom={14}
+        minZoom={12}
+        maxZoom={19}
         style={{ height: '100%', width: '100%' }}
         zoomControl={false}
       >
-        <ChangeView center={position} zoom={14} />
+        <ZoomTracker onZoom={setZoom} />
+        <ChangeView center={position} />
         <MapClickEvents onClick={onMapClick} />
 
-        {/* ── Carto Light tile (Google Maps style) ── */}
+        {/* ── OpenStreetMap — طرق + أسماء + مباني تلقائياً ── */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &amp; <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           maxZoom={19}
         />
 
-        {/* ── 5 Layer Groups ── */}
+        {/* ── 5 Layers ── */}
         <LayersControl position="topright" collapsed={false}>
 
-          {/* 🏘️ الأحياء */}
+          {/* 🏘️ الأحياء — مفعّلة افتراضياً */}
           <LayersControl.Overlay checked name="🏘️ الأحياء">
             <LayerGroup>
               {NEIGHBORHOODS.map((loc, i) => (
-                <LandmarkMarker
-                  key={`nh-${i}`}
-                  pos={[loc.lat, loc.lng]}
-                  name={loc.name}
-                  icon={ICONS.neighborhood}
-                />
+                <LandmarkMarker key={`nh-${i}`} pos={[loc.lat, loc.lng]}
+                  name={loc.name} icon={ICONS.neighborhood} zoom={zoom} />
               ))}
             </LayerGroup>
           </LayersControl.Overlay>
 
-          {/* 🏛️ الإدارات والمرافق */}
+          {/* 🏛️ الإدارات — مفعّلة افتراضياً */}
           <LayersControl.Overlay checked name="🏛️ الإدارات والمرافق">
             <LayerGroup>
               {ADMIN.map((loc, i) => (
-                <LandmarkMarker
-                  key={`ad-${i}`}
-                  pos={[loc.lat, loc.lng]}
-                  name={loc.name}
-                  icon={ICONS.admin}
-                />
+                <LandmarkMarker key={`ad-${i}`} pos={[loc.lat, loc.lng]}
+                  name={loc.name} icon={ICONS.admin} zoom={zoom} />
               ))}
             </LayerGroup>
           </LayersControl.Overlay>
 
-          {/* 📚 الثانويات */}
-          <LayersControl.Overlay checked name="📚 الثانويات">
+          {/* 📚 الثانويات — مخفية افتراضياً */}
+          <LayersControl.Overlay name="📚 الثانويات">
             <LayerGroup>
               {HIGHSCHOOLS.map((loc, i) => (
-                <LandmarkMarker
-                  key={`hs-${i}`}
-                  pos={[loc.lat, loc.lng]}
-                  name={loc.name}
-                  icon={ICONS.highschool}
-                />
+                <LandmarkMarker key={`hs-${i}`} pos={[loc.lat, loc.lng]}
+                  name={loc.name} icon={ICONS.highschool} zoom={zoom} />
               ))}
             </LayerGroup>
           </LayersControl.Overlay>
 
-          {/* 📖 الابتدائيات */}
-          <LayersControl.Overlay checked name="📖 الابتدائيات">
+          {/* 📖 الابتدائيات — مخفية افتراضياً */}
+          <LayersControl.Overlay name="📖 الابتدائيات">
             <LayerGroup>
               {PRIMARYSCHOOLS.map((loc, i) => (
-                <LandmarkMarker
-                  key={`ps-${i}`}
-                  pos={[loc.lat, loc.lng]}
-                  name={loc.name}
-                  icon={ICONS.primary}
-                />
+                <LandmarkMarker key={`ps-${i}`} pos={[loc.lat, loc.lng]}
+                  name={loc.name} icon={ICONS.primary} zoom={zoom} />
               ))}
             </LayerGroup>
           </LayersControl.Overlay>
 
-          {/* 🕌 المساجد */}
-          <LayersControl.Overlay checked name="🕌 المساجد">
+          {/* 🕌 المساجد — مخفية افتراضياً */}
+          <LayersControl.Overlay name="🕌 المساجد">
             <LayerGroup>
               {MOSQUES.map((loc, i) => (
-                <LandmarkMarker
-                  key={`ms-${i}`}
-                  pos={[loc.lat, loc.lng]}
-                  name={loc.name}
-                  icon={ICONS.mosque}
-                />
+                <LandmarkMarker key={`ms-${i}`} pos={[loc.lat, loc.lng]}
+                  name={loc.name} icon={ICONS.mosque} zoom={zoom} />
               ))}
             </LayerGroup>
           </LayersControl.Overlay>
