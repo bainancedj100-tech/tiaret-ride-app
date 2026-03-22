@@ -57,6 +57,12 @@ const NEIGHBORHOODS = [
   { name: 'حي لاقلاسيار',            lat: 35.3851, lng: 1.3149 },
   { name: 'حي 293 مسكن',             lat: 35.3860, lng: 1.3120 },
   { name: 'حي الصنوبر',              lat: 35.3820, lng: 1.3080 },
+  { name: 'حي 40 هكتار',             lat: 35.3780, lng: 1.3200 },
+  { name: 'حي لادم',                 lat: 35.3620, lng: 1.3100 },
+  { name: 'حي 100 سكن',              lat: 35.3655, lng: 1.3255 },
+  { name: 'حي 192 سكن',              lat: 35.3765, lng: 1.3155 },
+  { name: 'حي السعادة',              lat: 35.3695, lng: 1.3355 },
+  { name: 'حي الطلبة',               lat: 35.3670, lng: 1.3210 },
 ];
 
 const ADMIN = [
@@ -72,6 +78,11 @@ const ADMIN = [
   { name: 'حديقة رستم',                   lat: 35.3830, lng: 1.3050 },
   { name: 'غابة سيدي محمد',               lat: 35.3700, lng: 1.2900 },
   { name: 'فندق بوعزة',                   lat: 35.3650, lng: 1.3200 },
+  { name: 'مقر الدائرة تيارت',            lat: 35.3715, lng: 1.3190 },
+  { name: 'محكمة تيارت',                  lat: 35.3725, lng: 1.3210 },
+  { name: 'الضرائب (Les Impôts)',         lat: 35.3705, lng: 1.3230 },
+  { name: 'بريد الجزائر - المقر الرئيسي', lat: 35.3712, lng: 1.3168 },
+  { name: 'قاعة الحفلات تاج المحل',       lat: 35.3745, lng: 1.3300 },
 ];
 
 const HIGHSCHOOLS = [
@@ -85,6 +96,8 @@ const HIGHSCHOOLS = [
   { name: 'ثانوية عفان الطاهر',      lat: 35.3730, lng: 1.3130 },
   { name: 'ثانوية حيرش محمد',        lat: 35.3700, lng: 1.3250 },
   { name: 'ثانوية زايش عبد القادر',  lat: 35.3670, lng: 1.3250 },
+  { name: 'ثانوية محمد عصامي',       lat: 35.3770, lng: 1.3100 },
+  { name: 'ثانوية بلحرش السعيد',     lat: 35.3640, lng: 1.3200 },
 ];
 
 const PRIMARYSCHOOLS = [
@@ -96,6 +109,8 @@ const PRIMARYSCHOOLS = [
   { name: 'ابتدائية سيدي خالد',         lat: 35.3645, lng: 1.3290 },
   { name: 'ابتدائية ديار الشمس',        lat: 35.3718, lng: 1.3178 },
   { name: 'ابتدائية حي كارمان',         lat: 35.3688, lng: 1.3145 },
+  { name: 'ابتدائية 1 نوفمبر',          lat: 35.3720, lng: 1.3120 },
+  { name: 'ابتدائية بوعلام بن حمودة',   lat: 35.3660, lng: 1.3180 },
 ];
 
 const MOSQUES = [
@@ -106,6 +121,8 @@ const MOSQUES = [
   { name: 'مسجد البدر',                lat: 35.3708, lng: 1.3172 },
   { name: 'مسجد سيدي خالد',            lat: 35.3655, lng: 1.3285 },
   { name: 'مسجد الهدى',               lat: 35.3665, lng: 1.3280 },
+  { name: 'مسجد الفتح',                lat: 35.3690, lng: 1.3270 },
+  { name: 'مسجد عقبة بن نافع',         lat: 35.3755, lng: 1.3250 },
 ];
 
 // ── Zoom tracker ─────────────────────────────────────────────────────────────
@@ -186,11 +203,12 @@ const Map = ({ onMapClick, destination }) => {
         <ChangeView center={position} />
         <MapClickEvents onClick={onMapClick} />
 
-        {/* ── OpenStreetMap — طرق + أسماء + مباني تلقائياً ── */}
+        {/* ── CartoDB Voyager — أقرب لـ Google Maps (أبيض + طرق زرقاء رمادية) ── */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &amp; <a href="https://carto.com/">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
           maxZoom={19}
+          minZoom={12}
         />
 
         {/* ── 5 Layers ── */}

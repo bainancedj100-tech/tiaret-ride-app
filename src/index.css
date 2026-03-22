@@ -83,23 +83,29 @@
 /* ── Leaflet map ─────────────────────────────────────────────────────── */
 .leaflet-container {
   width: 100%; height: 100%; z-index: 0;
-  /* No filter — OSM tiles show roads/buildings/names natively */
+  background: #f8f9fa; /* Light background for cleaner look */
+  filter: none !important;
 }
 
 /* Emoji icon — transparent background */
-.custom-icon { background: none !important; border: none !important; }
+.custom-icon { 
+  background: none !important; 
+  border: none !important; 
+  font-size: 20px;
+  text-shadow: 0 2px 5px rgba(0,0,0,0.4);
+}
 
 /* Google Maps style tooltip */
 .gmaps-tooltip {
   background: white !important;
   border: none !important;
-  box-shadow: 0 3px 12px rgba(0,0,0,0.28) !important;
-  font-size: 12px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25) !important;
+  font-size: 13px !important;
+  padding: 4px 9px !important;
+  border-radius: 5px !important;
+  font-weight: 500 !important;
+  color: #222 !important;
   font-family: 'Cairo', sans-serif !important;
-  padding: 3px 9px !important;
-  border-radius: 4px !important;
-  font-weight: 600 !important;
-  color: #1a1a2e !important;
   white-space: nowrap !important;
 }
 .gmaps-tooltip::before { display: none !important; }
