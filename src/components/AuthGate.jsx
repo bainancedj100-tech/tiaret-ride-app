@@ -222,9 +222,6 @@ const AuthGate = ({ children }) => {
       <div className="absolute -top-32 -right-32 w-96 h-96 bg-brand/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-brand/5 rounded-full blur-3xl pointer-events-none" />
       
-      {/* Div required for reCAPTCHA widget */}
-      <div id="recaptcha-container"></div>
-
       {screen === 'welcome' && (
         <div className="text-center z-10 w-full max-w-sm">
           <div className="w-24 h-24 bg-brand rounded-[28px] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-brand/40">
