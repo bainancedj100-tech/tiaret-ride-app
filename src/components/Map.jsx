@@ -7,7 +7,13 @@ const Map = ({ onMapClick, destination }) => {
   const userMarkerRef = useRef(null);
   const destinationMarkerRef = useRef(null);
   const driverMarkersRef = useRef({});
+  const clickHandlerRef = useRef(onMapClick);
   const [drivers, setDrivers] = useState([]);
+
+  // Keep click handler ref updated
+  useEffect(() => {
+    clickHandlerRef.current = onMapClick;
+  }, [onMapClick]);
 
   // Initialize Map
   useEffect(() => {
@@ -21,16 +27,17 @@ const Map = ({ onMapClick, destination }) => {
         mapTypeControl: true,
         streetViewControl: true,
         fullscreenControl: true,
+        gestureHandling: 'greedy', // 🟢 Fix: One finger panning on mobile
       });
 
-      // Handle Map Click
+      // Handle Map Click via Ref to avoid listener churn
       mapInstanceRef.current.addListener('click', (e) => {
-        if (onMapClick) {
-          onMapClick({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+        if (clickHandlerRef.current) {
+          clickHandlerRef.current({ lat: e.latLng.lat(), lng: e.latLng.lng() });
         }
       });
     }
-  }, [onMapClick]);
+  }, []); // Only once
 
   // Track User Location
   useEffect(() => {

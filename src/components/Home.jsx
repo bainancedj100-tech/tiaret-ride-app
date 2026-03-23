@@ -20,7 +20,7 @@ const RiderHome = () => {
   const [rating, setRating] = useState(0);
 
   /* Tap on map → set destination */
-  const handleMapClick = (latlng) => {
+  const handleMapClick = React.useCallback((latlng) => {
     if (flow !== 'idle') return;
     setDestination(latlng);
     const dist = calculateDistanceKm(
@@ -29,7 +29,7 @@ const RiderHome = () => {
     );
     setDistance(dist.toFixed(1));
     setPrice(calculatePrice(latlng));
-  };
+  }, [flow]);
 
   /* Request ride → write to Firebase */
   const handleRequest = async () => {
