@@ -12,17 +12,27 @@ service cloud.firestore {
       // Driver reads only their own doc
       allow read: if request.auth != null
                   && (request.auth.token.phone_number == driverId
+                      || request.auth.uid == driverId
                       || request.auth.token.admin == true);
 
       // Driver can update their own location/status only (not balance/freeTrips)
       allow update: if request.auth != null
-                    && request.auth.token.phone_number == driverId
-                    && !('balance' in request.resource.data.diff(resource.data).affectedKeys())
-                    && !('freeTrips' in request.resource.data.diff(resource.data).affectedKeys());
+                    && (request.auth.token.phone_number == driverId || request.auth.uid == driverId)
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['balance', 'freeTrips']));
 
       // Only admin can create, delete, or update sensitive fields
       allow create, delete: if request.auth.token.admin == true;
       allow update: if request.auth.token.admin == true;
+    }
+
+    // ──────────────────────────────────────────────
+    // DRIVERS LOCATION collection (Real-time tracking)
+    // - Riders (anyone authed) can read
+    // - Drivers can only update their own location
+    // ──────────────────────────────────────────────
+    match /drivers_location/{driverId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (request.auth.uid == driverId || request.auth.token.phone_number == driverId || request.auth.token.admin == true);
     }
 
     // ──────────────────────────────────────────────

@@ -59,16 +59,18 @@ export const updateDriverFreeTrips = async (phone, freeTrips) => {
 };
 
 /** Driver: push live location */
-export const updateDriverLocation = async (phone, location) => {
-  await updateDoc(doc(db, "drivers", phone), {
+export const updateDriverLocation = async (uid, location, extraData = {}) => {
+  // Use setDoc to the dedicated drivers_location collection
+  await setDoc(doc(db, "drivers_location", uid), {
     location,
     updatedAt: new Date().toISOString(),
-  });
+    ...extraData
+  }, { merge: true });
 };
 
 /** Listen to a specific driver's profile — real-time */
-export const listenToDriver = (phone, callback) => {
-  return onSnapshot(doc(db, "drivers", phone), (snap) => {
+export const listenToDriver = (uid, callback) => {
+  return onSnapshot(doc(db, "drivers", uid), (snap) => {
     callback(snap.exists() ? { id: snap.id, ...snap.data() } : null);
   });
 };
@@ -83,8 +85,8 @@ export const listenToAllDrivers = (callback) => {
 
 /** Listen to available drivers for map — riders */
 export const listenToAvailableDrivers = (callback) => {
-  const q = query(collection(db, "drivers"), where("status", "==", "active"));
-  return onSnapshot(q, (snapshot) => {
+  // Listen directly to drivers_location collection for real-time tracking
+  return onSnapshot(collection(db, "drivers_location"), (snapshot) => {
     const drivers = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     callback(drivers);
   });

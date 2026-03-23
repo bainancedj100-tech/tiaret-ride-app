@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, updateDoc, collection, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { updateDriverLocation } from '../services/db';
 import {
   Car, Navigation, CheckCircle2, WifiOff, AlertTriangle,
   LogIn, Loader2, Phone, Clock, Ban, ShieldCheck
@@ -61,9 +62,9 @@ const DriverDashboard = () => {
       watchRef.current = navigator.geolocation.watchPosition(
         async pos => {
           try {
-            await updateDoc(doc(db, 'drivers', phone), {
-              location: { lat: pos.coords.latitude, lng: pos.coords.longitude },
-              updatedAt: new Date().toISOString(),
+            await updateDriverLocation(phone, { lat: pos.coords.latitude, lng: pos.coords.longitude }, {
+              name: driverData.firstName,
+              vehicle: driverData.vehicle || 'سيارة عادية'
             });
           } catch { /* offline ok */ }
         },
@@ -73,7 +74,7 @@ const DriverDashboard = () => {
     } else {
       if (watchRef.current) navigator.geolocation.clearWatch(watchRef.current);
       if (phone && !isOnline) {
-        updateDoc(doc(db, 'drivers', phone), { location: null }).catch(() => {});
+        updateDriverLocation(phone, null).catch(() => {});
       }
     }
     return () => { if (watchRef.current) navigator.geolocation.clearWatch(watchRef.current); };

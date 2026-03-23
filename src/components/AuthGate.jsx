@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
-import { Loader2, Car, User, Phone, ArrowRight, MapPin } from 'lucide-react';
+import { Loader2, Car, User, Phone, ArrowRight, MapPin, KeyRound } from 'lucide-react';
 
 /* ============================================================
    SCREENS:
    'loading'       → spinner while Firebase checks auth
-   'welcome'       → landing page: "إنشاء حساب" / "تسجيل الدخول"
-   'register'      → new account form (name + phone)
-   'login'         → returning user phone entry
-   'role_select'   → choose Rider or Driver after auth
+   'welcome'       → landing page
+   'phone_entry'   → enter phone number (+213)
+   'otp_entry'     → enter 6-digit OTP
+   'profile_setup' → new user enters name and selects role
    'driver_pending'→ driver waiting for admin approval
-   'authed'        → render children (app content)
+   'authed'        → render app content
 ============================================================ */
 
 const AuthGate = ({ children }) => {
@@ -22,114 +22,160 @@ const AuthGate = ({ children }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const [form, setForm] = useState({ firstName: '', lastName: '', phone: '' });
+  // Form State
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [role, setRole] = useState('');
+
+  // OTP Firebase Result
+  const [confirmationResult, setConfirmationResult] = useState(null);
 
   /* ── Firebase Auth Check on Mount ── */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        try {
-          const snap = await getDoc(doc(db, 'users', user.uid));
-          if (snap.exists()) {
-            const data = snap.data();
-            setUserRole(data.role);
-
-            if (data.role === 'driver') {
-              // Check driver application status
-              const driverSnap = await getDoc(doc(db, 'drivers', data.phone || user.uid));
-              if (driverSnap.exists()) {
-                setDriverStatus(driverSnap.data().status);
-                setScreen('authed');
-              } else {
-                // Check driver_applications
-                setDriverStatus('pending');
-                setScreen('driver_pending');
-              }
-            } else {
-              setScreen('authed');
-            }
-          } else {
-            setScreen('welcome');
-          }
-        } catch {
-          const cached = localStorage.getItem('tiaret_user');
-          if (cached) {
-            const u = JSON.parse(cached);
-            setUserRole(u.role || 'rider');
-            setScreen(u.role === 'driver' && !u.driverApproved ? 'driver_pending' : 'authed');
-          } else {
-            setScreen('welcome');
-          }
-        }
+        checkUserInFirestore(user.uid, user.phoneNumber);
       } else {
-        const cached = localStorage.getItem('tiaret_user');
-        if (cached) {
-          const u = JSON.parse(cached);
-          setUserRole(u.role || 'rider');
-          setScreen(u.role === 'driver' && !u.driverApproved ? 'driver_pending' : 'authed');
-        } else {
-          setScreen('welcome');
-        }
+        setScreen('welcome');
       }
     });
+
+    // Setup Invisible Recaptcha
+    if (!window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
+      });
+    }
+
     return () => unsub();
   }, []);
 
-  /* ── Register New User ── */
-  const handleRegister = async (e) => {
+  const checkUserInFirestore = async (uid, phone) => {
+    try {
+      const snap = await getDoc(doc(db, 'users', uid));
+      if (snap.exists()) {
+        const data = snap.data();
+        setUserRole(data.role);
+
+        if (data.role === 'driver') {
+          // Check driver application status (drivers collection uses uid or phone)
+          const driverSnap = await getDoc(doc(db, 'drivers', uid));
+          if (driverSnap.exists()) {
+            setDriverStatus(driverSnap.data().status);
+            setScreen('authed');
+          } else {
+            setDriverStatus('pending');
+            setScreen('authed'); // DriverDashboard will handle pending state if needed, or we show driver_pending
+            // Let's forward them to driver_pending if they don't have driver profile yet or pending
+            setScreen('driver_pending');
+          }
+        } else {
+          setScreen('authed');
+        }
+      } else {
+        // User authenticated but no profile yet -> ask for name & role
+        setScreen('profile_setup');
+      }
+    } catch (e) {
+      console.error(e);
+      setScreen('welcome');
+    }
+  };
+
+  /* ── Send OTP ── */
+  const handleSendOtp = async (e) => {
     e.preventDefault();
-    if (!form.firstName || !form.lastName || !form.phone) {
-      setError('يرجى ملء جميع الحقول');
+    setError('');
+    
+    // Format to Algeria +213 if starting with 0
+    let formattedPhone = phoneNumber.trim();
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '+213' + formattedPhone.substring(1);
+    } else if (!formattedPhone.startsWith('+')) {
+      formattedPhone = '+213' + formattedPhone;
+    }
+
+    if (formattedPhone.length < 10) {
+      setError('يرجى إدخال رقم هاتف صحيح');
       return;
     }
+
+    setLoading(true);
+    try {
+      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
+      setConfirmationResult(confirmation);
+      setScreen('otp_entry');
+    } catch (err) {
+      console.error(err);
+      setError('فشل إرسال رمز التحقق. تأكد من الرقم والمحاولة مرة أخرى.');
+    }
+    setLoading(false);
+  };
+
+  /* ── Verify OTP ── */
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    if (!otpCode || otpCode.length < 6) {
+      setError('أدخل الرمز المكون من 6 أرقام');
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
-      let uid = auth.currentUser?.uid;
-      if (!uid) {
-        const cred = await signInAnonymously(auth);
-        uid = cred.user.uid;
-      }
-      await setDoc(doc(db, 'users', uid), { ...form, createdAt: new Date().toISOString() });
-    } catch {/* Firebase may not be configured — offline fallback */}
-    localStorage.setItem('tiaret_user', JSON.stringify({ ...form }));
-    setLoading(false);
-    setScreen('role_select');
+      const result = await confirmationResult.confirm(otpCode);
+      // Let onAuthStateChanged handle the redirect
+      checkUserInFirestore(result.user.uid, result.user.phoneNumber);
+    } catch (err) {
+      console.error(err);
+      setError('الرمز غير صحيح، حاول مرة أخرى');
+      setLoading(false);
+    }
   };
 
-  /* ── Login Existing User ── */
-  const handleLogin = (e) => {
+  /* ── Save Profile ── */
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    if (!form.phone) { setError('أدخل رقم هاتفك'); return; }
-    const cached = localStorage.getItem('tiaret_user');
-    if (cached) {
-      const u = JSON.parse(cached);
-      setUserRole(u.role || 'rider');
-      setScreen(u.role === 'driver' && !u.driverApproved ? 'driver_pending' : 'authed');
-    } else {
-      setError('لم يتم العثور على حساب. أنشئ حساباً جديداً.');
+    if (!firstName || !lastName || !role) {
+      setError('يرجى تعبئة جميع الحقول واختيار دورك');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const user = auth.currentUser;
+      const uid = user.uid;
+      const phone = user.phoneNumber;
+
+      await setDoc(doc(db, 'users', uid), {
+        firstName,
+        lastName,
+        phone,
+        role,
+        createdAt: new Date().toISOString()
+      });
+
+      setUserRole(role);
+      
+      if (role === 'driver') {
+        window.location.hash = '#/driver/register';
+        setScreen('authed');
+      } else {
+        setScreen('authed');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('حدث خطأ أثناء حفظ البيانات');
+      setLoading(false);
     }
   };
 
-  /* ── Select Role ── */
-  const handleSelectRole = async (role) => {
-    setUserRole(role);
-    const cached = JSON.parse(localStorage.getItem('tiaret_user') || '{}');
-    const updated = { ...cached, role };
-    localStorage.setItem('tiaret_user', JSON.stringify(updated));
-    try {
-      if (auth.currentUser) {
-        await setDoc(doc(db, 'users', auth.currentUser.uid), { role }, { merge: true });
-      }
-    } catch {/* offline ok */}
-
-    if (role === 'driver') {
-      // Redirect to driver registration
-      window.location.hash = '#/driver/register';
-      setScreen('authed');
-    } else {
-      setScreen('authed');
-    }
+  const handleLogout = () => {
+    signOut(auth);
+    setScreen('welcome');
   };
 
   /* ══════════════════ SCREENS ══════════════════ */
@@ -157,193 +203,122 @@ const AuthGate = ({ children }) => {
           <div className="w-20 h-20 bg-yellow-400/20 rounded-full flex items-center justify-center mx-auto mb-6">
             <Loader2 className="w-10 h-10 text-yellow-400 animate-spin" />
           </div>
-          <h2 className="text-2xl font-black text-white mb-3">طلبك قيد المراجعة</h2>
+          <h2 className="text-2xl font-black text-white mb-3">قيد المراجعة أو التسجيل</h2>
           <p className="text-white/60 leading-relaxed mb-8">
-            شكراً على تسجيلك كسائق. سيقوم فريقنا بمراجعة مستنداتك وتفعيل حسابك في أقرب وقت ممكن.
+            يرجى إكمال تسجيل بيانات السائق (رفع الوثائق) إن لم تفعل ذلك بعد، أو انتظر موافقة الإدارة.
           </p>
-          <div className="bg-yellow-400/10 border border-yellow-400/30 rounded-2xl p-4">
-            <p className="text-yellow-300 text-sm font-bold">📍 يمكنك متابعتنا على تيارت لمعرفة حالة طلبك</p>
+          <div className="space-y-3">
+             <button onClick={() => { window.location.hash='#/driver/register'; setScreen('authed'); }} className="btn-primary w-full">إكمال التسجيل</button>
+             <button onClick={handleLogout} className="btn-ghost w-full">تسجيل الخروج</button>
           </div>
         </div>
       </div>
     );
   }
 
-  /* ── Common card wrapper ── */
-  const commonBg = (
-    <div className="min-h-screen bg-dark relative overflow-hidden flex flex-col" dir="rtl">
-      {/* decorative circles */}
-      <div className="absolute -top-32 -right-32 w-80 h-80 bg-brand/10 rounded-full blur-3xl pointer-events-none" />
+  return (
+    <div className="min-h-screen bg-dark relative overflow-hidden flex flex-col items-center justify-center px-6" dir="rtl">
+      {/* Background Decorative Circles */}
+      <div className="absolute -top-32 -right-32 w-96 h-96 bg-brand/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-brand/5 rounded-full blur-3xl pointer-events-none" />
-    </div>
-  );
+      
+      {/* Div required for reCAPTCHA widget */}
+      <div id="recaptcha-container"></div>
 
-  /* ─── WELCOME ─── */
-  if (screen === 'welcome') {
-    return (
-      <div className="min-h-screen bg-dark relative overflow-hidden flex flex-col items-center justify-center px-6" dir="rtl">
-        <div className="absolute -top-32 -right-32 w-96 h-96 bg-brand/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-brand/5 rounded-full blur-3xl" />
-
-        {/* Logo / Hero */}
-        <div className="text-center mb-12 z-10">
+      {screen === 'welcome' && (
+        <div className="text-center z-10 w-full max-w-sm">
           <div className="w-24 h-24 bg-brand rounded-[28px] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-brand/40">
             <Car className="w-12 h-12 text-white" />
           </div>
           <h1 className="text-4xl font-black text-white mb-2">تيارت رايد</h1>
-          <p className="text-white/50 text-lg">خدمة توصيل ذكية في مدينة تيارت</p>
-        </div>
-
-        {/* Buttons */}
-        <div className="w-full max-w-sm space-y-4 z-10">
-          <button
-            onClick={() => { setForm({ firstName: '', lastName: '', phone: '' }); setScreen('register'); }}
-            className="btn-primary w-full"
-          >
-            إنشاء حساب جديد
-          </button>
-          <button
-            onClick={() => { setForm({ firstName: '', lastName: '', phone: '' }); setScreen('login'); }}
-            className="btn-ghost w-full"
-          >
-            تسجيل الدخول
+          <p className="text-white/50 text-lg mb-10">خدمة توصيل ذكية وآمنة في تيارت</p>
+          <button onClick={() => setScreen('phone_entry')} className="btn-primary w-full flex justify-center items-center gap-2">
+            الدخول برقم الهاتف <Phone className="w-5 h-5" />
           </button>
         </div>
+      )}
 
-        <p className="text-white/30 text-sm mt-10 z-10 text-center">نسخة تجريبية — تيارت، الجزائر</p>
-      </div>
-    );
-  }
-
-  /* ─── REGISTER ─── */
-  if (screen === 'register') {
-    return (
-      <div className="min-h-screen bg-dark flex flex-col" dir="rtl">
-        <div className="absolute -top-32 -right-32 w-96 h-96 bg-brand/10 rounded-full blur-3xl" />
-
-        {/* Header */}
-        <div className="p-6 pt-12 text-center">
-          <div className="w-16 h-16 bg-brand rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand/30">
-            <User className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-3xl font-black text-white mb-1">إنشاء حساب</h2>
-          <p className="text-white/50">أدخل بياناتك للبدء</p>
-        </div>
-
-        {/* Form Card */}
-        <div className="flex-1 px-6 pb-8">
-          <div className="glass-card rounded-3xl p-6 mt-4">
-            {error && <div className="bg-red-500/20 border border-red-500/50 text-red-300 p-3 rounded-xl mb-4 text-sm font-bold text-center">{error}</div>}
-
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div>
-                <label className="label-ar">الاسم الأول</label>
-                <input type="text" placeholder="مثال: سامي" value={form.firstName}
-                  onChange={e => setForm({ ...form, firstName: e.target.value })}
-                  className="input-ar" />
-              </div>
-              <div>
-                <label className="label-ar">اللقب</label>
-                <input type="text" placeholder="مثال: بلعيد" value={form.lastName}
-                  onChange={e => setForm({ ...form, lastName: e.target.value })}
-                  className="input-ar" />
-              </div>
-              <div>
-                <label className="label-ar">رقم الهاتف</label>
-                <div className="relative">
-                  <Phone className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
-                  <input type="tel" placeholder="05XX XX XX XX" value={form.phone}
-                    onChange={e => setForm({ ...form, phone: e.target.value })}
-                    className="input-ar pl-12 text-left" dir="ltr" />
-                </div>
-              </div>
-
-              <button type="submit" disabled={loading} className="btn-primary w-full mt-2 flex items-center justify-center gap-2">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>متابعة <ArrowRight className="w-5 h-5" /></>}
-              </button>
-            </form>
-
-            <button onClick={() => setScreen('welcome')} className="btn-ghost w-full mt-3">
-              رجوع
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  /* ─── LOGIN ─── */
-  if (screen === 'login') {
-    return (
-      <div className="min-h-screen bg-dark flex flex-col items-center justify-center px-6" dir="rtl">
-        <div className="absolute -top-32 -right-32 w-96 h-96 bg-brand/10 rounded-full blur-3xl" />
-        <div className="glass-card w-full max-w-sm p-8 rounded-3xl">
-          <div className="w-16 h-16 bg-brand/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <Phone className="w-8 h-8 text-brand" />
-          </div>
-          <h2 className="text-2xl font-black text-white text-center mb-1">تسجيل الدخول</h2>
-          <p className="text-white/50 text-center mb-6 text-sm">أدخل رقم هاتفك المسجل</p>
-
-          {error && <div className="bg-red-500/20 border border-red-500/50 text-red-300 p-3 rounded-xl mb-4 text-sm font-bold text-center">{error}</div>}
-
-          <form onSubmit={handleLogin} className="space-y-4">
+      {screen === 'phone_entry' && (
+        <div className="glass-card w-full max-w-sm p-8 rounded-3xl z-10">
+          <button onClick={() => setScreen('welcome')} className="text-white/50 hover:text-white mb-6">← رجوع</button>
+          <h2 className="text-2xl font-black text-white mb-2">تسجيل الدخول / إنشاء حساب</h2>
+          <p className="text-white/50 text-sm mb-6">أدخل رقم هاتفك لتسجيل الدخول أو لإنشاء حساب جديد.</p>
+          {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-xl mb-4 text-sm font-bold text-center">{error}</div>}
+          <form onSubmit={handleSendOtp} className="space-y-4">
             <div className="relative">
               <Phone className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
-              <input type="tel" placeholder="05XX XX XX XX" value={form.phone}
-                onChange={e => setForm({ ...form, phone: e.target.value })}
+              <input type="tel" placeholder="05XX XX XX XX" value={phoneNumber}
+                onChange={e => setPhoneNumber(e.target.value)}
                 className="input-ar pl-12 text-left" dir="ltr" />
             </div>
-            <button type="submit" className="btn-primary w-full">دخول</button>
+            <button type="submit" disabled={loading} className="btn-primary w-full flex justify-center items-center gap-2">
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'المتابعة'}
+            </button>
           </form>
-          <button onClick={() => setScreen('welcome')} className="btn-ghost w-full mt-3">رجوع</button>
         </div>
-      </div>
-    );
-  }
+      )}
 
-  /* ─── ROLE SELECTION ─── */
-  if (screen === 'role_select') {
-    return (
-      <div className="min-h-screen bg-dark flex flex-col items-center justify-center px-6" dir="rtl">
-        <div className="absolute -top-32 -right-32 w-96 h-96 bg-brand/10 rounded-full blur-3xl" />
-
-        <div className="text-center mb-10 z-10">
-          <h2 className="text-3xl font-black text-white mb-2">من أنت؟</h2>
-          <p className="text-white/50">اختر دورك في التطبيق</p>
+      {screen === 'otp_entry' && (
+        <div className="glass-card w-full max-w-sm p-8 rounded-3xl z-10 text-center">
+          <button onClick={() => setScreen('phone_entry')} className="text-white/50 hover:text-white mb-6 block text-right w-full">← تعديل الرقم</button>
+          <div className="w-16 h-16 bg-brand/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <KeyRound className="w-8 h-8 text-brand" />
+          </div>
+          <h2 className="text-2xl font-black text-white mb-2">تأكيد الرقم</h2>
+          <p className="text-white/50 text-sm mb-6">أدخل رمز التحقق الذي وصلك في رسالة نصية</p>
+          {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-xl mb-4 text-sm font-bold text-center">{error}</div>}
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <div className="relative">
+              <input type="number" placeholder="123456" value={otpCode}
+                onChange={e => setOtpCode(e.target.value)}
+                className="input-ar text-center text-2xl tracking-[0.5em]" dir="ltr" />
+            </div>
+            <button type="submit" disabled={loading} className="btn-primary w-full flex justify-center items-center gap-2">
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'تأكيد الرمز'}
+            </button>
+          </form>
         </div>
+      )}
 
-        <div className="w-full max-w-sm space-y-4 z-10">
-          {/* Rider Card */}
-          <button onClick={() => handleSelectRole('rider')}
-            className="w-full glass-card rounded-3xl p-6 flex items-center gap-5 hover:border-brand/60 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border border-white/10 text-right">
-            <div className="w-16 h-16 bg-brand/20 rounded-2xl flex items-center justify-center flex-shrink-0">
-              <User className="w-8 h-8 text-brand" />
+      {screen === 'profile_setup' && (
+        <div className="glass-card w-full max-w-sm p-8 rounded-3xl z-10 mt-12">
+          <h2 className="text-2xl font-black text-white mb-2 text-center">أهلاً بك في تيارت رايد!</h2>
+          <p className="text-white/50 text-sm mb-6 text-center">دعنا نتعرف عليك ونقوم بإكمال ملفك الشخصي</p>
+          {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-xl mb-4 text-sm font-bold text-center">{error}</div>}
+          <form onSubmit={handleSaveProfile} className="space-y-4">
+            <div>
+              <label className="label-ar">الاسم الأول</label>
+              <input type="text" placeholder="مثال: سامي" value={firstName}
+                onChange={e => setFirstName(e.target.value)} className="input-ar" />
             </div>
-            <div className="flex-1">
-              <h3 className="text-xl font-black text-white">راكب</h3>
-              <p className="text-white/50 text-sm mt-0.5">اطلب رحلة أو خدمة توصيل</p>
+            <div>
+              <label className="label-ar">اللقب</label>
+              <input type="text" placeholder="مثال: بلعيد" value={lastName}
+                onChange={e => setLastName(e.target.value)} className="input-ar" />
             </div>
-            <ArrowRight className="w-5 h-5 text-white/30 rotate-180" />
-          </button>
+            
+            <label className="label-ar pt-2">اختر نوع حسابك</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button type="button" onClick={() => setRole('rider')}
+                className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${role === 'rider' ? 'border-brand bg-brand/10' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}>
+                <User className={`w-8 h-8 mb-2 ${role === 'rider' ? 'text-brand' : 'text-white/50'}`} />
+                <span className={`font-bold ${role === 'rider' ? 'text-brand' : 'text-white'}`}>راكب</span>
+              </button>
+              <button type="button" onClick={() => setRole('driver')}
+                className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${role === 'driver' ? 'border-green-400 bg-green-400/10' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}>
+                <Car className={`w-8 h-8 mb-2 ${role === 'driver' ? 'text-green-400' : 'text-white/50'}`} />
+                <span className={`font-bold ${role === 'driver' ? 'text-green-400' : 'text-white'}`}>سائق</span>
+              </button>
+            </div>
 
-          {/* Driver Card */}
-          <button onClick={() => handleSelectRole('driver')}
-            className="w-full glass-card rounded-3xl p-6 flex items-center gap-5 hover:border-brand/60 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border border-white/10 text-right">
-            <div className="w-16 h-16 bg-green-400/20 rounded-2xl flex items-center justify-center flex-shrink-0">
-              <Car className="w-8 h-8 text-green-400" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-xl font-black text-white">سائق</h3>
-              <p className="text-white/50 text-sm mt-0.5">انضم كشريك سائق في تيارت</p>
-            </div>
-            <ArrowRight className="w-5 h-5 text-white/30 rotate-180" />
-          </button>
+            <button type="submit" disabled={loading} className="btn-primary w-full mt-6 flex justify-center items-center gap-2">
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'إنهاء وإكمال التسجيل'}
+            </button>
+          </form>
         </div>
-      </div>
-    );
-  }
-
-  return null;
+      )}
+    </div>
+  );
 };
 
 export default AuthGate;
