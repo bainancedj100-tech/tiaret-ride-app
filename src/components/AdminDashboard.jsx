@@ -115,7 +115,7 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="h-screen bg-gray-50 overflow-y-auto font-sans pb-10" dir="rtl">
+    <div className="h-[100dvh] bg-gray-50 overflow-y-auto font-sans pb-10" dir="rtl">
       {/* ── Toast Notifications ── */}
       <div className="fixed top-4 left-4 z-50 space-y-2">
         {notifications.map(n => (

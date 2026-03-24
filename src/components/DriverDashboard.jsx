@@ -109,7 +109,7 @@ const DriverDashboard = () => {
   /* ── 1. LOGIN ── */
   if (!isLoggedIn) {
     return (
-      <div className="h-screen bg-dark overflow-y-auto flex items-center justify-center p-6" dir="rtl">
+      <div className="h-[100dvh] bg-dark overflow-y-auto flex items-center justify-center p-6" dir="rtl">
         <div className="absolute -top-32 -right-32 w-96 h-96 bg-brand/10 rounded-full blur-3xl" />
         <div className="glass-card w-full max-w-sm p-8 rounded-3xl z-10">
           <div className="w-16 h-16 bg-brand/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -141,7 +141,7 @@ const DriverDashboard = () => {
   /* ── 2. LOADING ── */
   if (driverData === undefined) {
     return (
-      <div className="h-screen bg-dark overflow-y-auto flex items-center justify-center" dir="rtl">
+      <div className="h-[100dvh] bg-dark overflow-y-auto flex items-center justify-center" dir="rtl">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-brand animate-spin mx-auto mb-4" />
           <p className="text-white/60 font-bold">جارٍ تحميل ملفك الشخصي...</p>
@@ -153,7 +153,7 @@ const DriverDashboard = () => {
   /* ── 3. NOT FOUND ── */
   if (driverData === null) {
     return (
-      <div className="h-screen bg-dark overflow-y-auto flex items-center justify-center p-6" dir="rtl">
+      <div className="h-[100dvh] bg-dark overflow-y-auto flex items-center justify-center p-6" dir="rtl">
         <div className="glass-card w-full max-w-sm p-8 rounded-3xl text-center">
           <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-black text-white mb-2">الحساب غير موجود</h2>
@@ -168,7 +168,7 @@ const DriverDashboard = () => {
   /* ── 4. PENDING ── */
   if (driverData.status === 'pending') {
     return (
-      <div className="h-screen bg-dark overflow-y-auto flex flex-col items-center justify-center px-6" dir="rtl">
+      <div className="h-[100dvh] bg-dark overflow-y-auto flex flex-col items-center justify-center px-6" dir="rtl">
         <div className="absolute -top-32 -right-32 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl" />
         <div className="glass-card w-full max-w-sm p-8 rounded-3xl text-center z-10">
           <div className="w-20 h-20 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto mb-6">
@@ -192,7 +192,7 @@ const DriverDashboard = () => {
   /* ── 5. BANNED ── */
   if (driverData.status === 'banned') {
     return (
-      <div className="h-screen bg-dark overflow-y-auto flex flex-col items-center justify-center px-6" dir="rtl">
+      <div className="h-[100dvh] bg-dark overflow-y-auto flex flex-col items-center justify-center px-6" dir="rtl">
         <div className="absolute -top-32 -right-32 w-96 h-96 bg-red-500/10 rounded-full blur-3xl" />
         <div className="glass-card w-full max-w-sm p-8 rounded-3xl text-center z-10">
           <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-6">
@@ -213,7 +213,7 @@ const DriverDashboard = () => {
   const isBlocked = (driverData.freeTrips ?? 0) <= 0 && (driverData.balance || 0) <= 0;
   if (isBlocked) {
     return (
-      <div className="h-screen bg-dark overflow-y-auto flex flex-col items-center justify-center px-6" dir="rtl">
+      <div className="h-[100dvh] bg-dark overflow-y-auto flex flex-col items-center justify-center px-6" dir="rtl">
         <div className="absolute -top-32 -right-32 w-96 h-96 bg-red-500/10 rounded-full blur-3xl" />
         <div className="glass-card w-full max-w-sm p-8 rounded-3xl text-center z-10">
           <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -242,7 +242,7 @@ const DriverDashboard = () => {
   const freeLeft = driverData.freeTrips ?? 0;
 
   return (
-    <div className="h-screen bg-dark overflow-y-auto pb-10 flex flex-col p-5 pt-12 max-w-md mx-auto relative" dir="rtl">
+    <div className="h-[100dvh] bg-dark overflow-y-auto pb-10 flex flex-col p-5 pt-12 max-w-md mx-auto relative" dir="rtl">
       <div className="absolute -top-32 -right-32 w-96 h-96 bg-brand/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header */}

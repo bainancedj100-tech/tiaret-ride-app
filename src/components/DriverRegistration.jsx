@@ -191,7 +191,7 @@ const DriverRegistration = () => {
   );
 
   return (
-    <div className="h-screen bg-dark flex flex-col overflow-y-auto pb-6" dir="rtl">
+    <div className="h-[100dvh] bg-dark flex flex-col overflow-y-auto pb-6" dir="rtl">
       <div className="absolute -top-32 -right-32 w-96 h-96 bg-brand/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header */}

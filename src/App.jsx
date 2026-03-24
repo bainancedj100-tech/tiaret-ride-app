@@ -35,7 +35,7 @@ function App() {
 
   return (
     <Router>
-      <div className="w-full h-screen relative overflow-hidden" style={{ background: '#0a0f1e' }}>
+      <div className="w-full h-[100dvh] relative overflow-hidden" style={{ background: '#0a0f1e' }}>
         <Routes>
           {/* Admin — PIN protected, no user auth needed */}
           <Route path="/admin" element={
