@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
-import { Loader2, Car, User, Phone, ArrowRight, MapPin, KeyRound } from 'lucide-react';
+import { Loader2, Car, User, ArrowRight, MapPin } from 'lucide-react';
 
 /* ============================================================
    SCREENS:
    'loading'       → spinner while Firebase checks auth
-   'welcome'       → landing page
-   'phone_entry'   → enter phone number (+213)
-   'otp_entry'     → enter 6-digit OTP
+   'welcome'       → landing page (Google Sign In)
    'profile_setup' → new user enters name and selects role
    'driver_pending'→ driver waiting for admin approval
    'authed'        → render app content
@@ -23,36 +21,24 @@ const AuthGate = ({ children }) => {
   const [loading, setLoading] = useState(false);
 
   // Form State
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [otpCode, setOtpCode] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [role, setRole] = useState('');
-
-  // OTP Firebase Result
-  const [confirmationResult, setConfirmationResult] = useState(null);
 
   /* ── Firebase Auth Check on Mount ── */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        checkUserInFirestore(user.uid, user.phoneNumber);
+        checkUserInFirestore(user.uid, user.email);
       } else {
         setScreen('welcome');
       }
     });
 
-    // Setup Invisible Recaptcha
-    if (!window.recaptchaVerifier) {
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'invisible',
-      });
-    }
-
     return () => unsub();
   }, []);
 
-  const checkUserInFirestore = async (uid, phone) => {
+  const checkUserInFirestore = async (uid, email) => {
     try {
       const snap = await getDoc(doc(db, 'users', uid));
       if (snap.exists()) {
@@ -60,15 +46,13 @@ const AuthGate = ({ children }) => {
         setUserRole(data.role);
 
         if (data.role === 'driver') {
-          // Check driver application status (drivers collection uses uid or phone)
+          // Check driver application status
           const driverSnap = await getDoc(doc(db, 'drivers', uid));
           if (driverSnap.exists()) {
             setDriverStatus(driverSnap.data().status);
             setScreen('authed');
           } else {
             setDriverStatus('pending');
-            setScreen('authed'); // DriverDashboard will handle pending state if needed, or we show driver_pending
-            // Let's forward them to driver_pending if they don't have driver profile yet or pending
             setScreen('driver_pending');
           }
         } else {
@@ -76,6 +60,12 @@ const AuthGate = ({ children }) => {
         }
       } else {
         // User authenticated but no profile yet -> ask for name & role
+        // Pre-fill name if Google provided it
+        if (auth.currentUser?.displayName) {
+          const parts = auth.currentUser.displayName.split(' ');
+          setFirstName(parts[0] || '');
+          setLastName(parts.slice(1).join(' ') || '');
+        }
         setScreen('profile_setup');
       }
     } catch (e) {
@@ -84,53 +74,17 @@ const AuthGate = ({ children }) => {
     }
   };
 
-  /* ── Send OTP ── */
-  const handleSendOtp = async (e) => {
-    e.preventDefault();
-    setError('');
-    
-    // Format to Algeria +213 if starting with 0
-    let formattedPhone = phoneNumber.trim();
-    if (formattedPhone.startsWith('0')) {
-      formattedPhone = '+213' + formattedPhone.substring(1);
-    } else if (!formattedPhone.startsWith('+')) {
-      formattedPhone = '+213' + formattedPhone;
-    }
-
-    if (formattedPhone.length < 10) {
-      setError('يرجى إدخال رقم هاتف صحيح');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
-      setConfirmationResult(confirmation);
-      setScreen('otp_entry');
-    } catch (err) {
-      console.error(err);
-      setError('فشل إرسال رمز التحقق. تأكد من الرقم والمحاولة مرة أخرى.');
-    }
-    setLoading(false);
-  };
-
-  /* ── Verify OTP ── */
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    if (!otpCode || otpCode.length < 6) {
-      setError('أدخل الرمز المكون من 6 أرقام');
-      return;
-    }
-
+  /* ── Google Sign In ── */
+  const handleGoogleLogin = async () => {
     setLoading(true);
     setError('');
     try {
-      const result = await confirmationResult.confirm(otpCode);
-      // Let onAuthStateChanged handle the redirect
-      checkUserInFirestore(result.user.uid, result.user.phoneNumber);
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      // onAuthStateChanged will handle the auth state update automatically
     } catch (err) {
       console.error(err);
-      setError('الرمز غير صحيح، حاول مرة أخرى');
+      setError('حدث خطأ أثناء تسجيل الدخول بحساب قوقل.');
       setLoading(false);
     }
   };
@@ -138,8 +92,8 @@ const AuthGate = ({ children }) => {
   /* ── Save Profile ── */
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-    if (!firstName || !lastName || !role) {
-      setError('يرجى تعبئة جميع الحقول واختيار دورك');
+    if (!firstName || !role) {
+      setError('يرجى تعبئة الاسم الأول على الأقل واختيار دورك');
       return;
     }
 
@@ -148,12 +102,12 @@ const AuthGate = ({ children }) => {
     try {
       const user = auth.currentUser;
       const uid = user.uid;
-      const phone = user.phoneNumber;
+      const email = user.email;
 
       await setDoc(doc(db, 'users', uid), {
         firstName,
         lastName,
-        phone,
+        email,
         role,
         createdAt: new Date().toISOString()
       });
@@ -199,7 +153,7 @@ const AuthGate = ({ children }) => {
   if (screen === 'driver_pending') {
     return (
       <div className="min-h-screen bg-dark flex items-center justify-center p-6" dir="rtl">
-        <div className="glass-card max-w-sm w-full p-8 rounded-3xl text-center">
+        <div className="glass-card max-w-sm w-full p-8 rounded-3xl text-center z-10">
           <div className="w-20 h-20 bg-yellow-400/20 rounded-full flex items-center justify-center mx-auto mb-6">
             <Loader2 className="w-10 h-10 text-yellow-400 animate-spin" />
           </div>
@@ -229,58 +183,34 @@ const AuthGate = ({ children }) => {
           </div>
           <h1 className="text-4xl font-black text-white mb-2">تيارت رايد</h1>
           <p className="text-white/50 text-lg mb-10">خدمة توصيل ذكية وآمنة في تيارت</p>
-          <button onClick={() => setScreen('phone_entry')} className="btn-primary w-full flex justify-center items-center gap-2">
-            الدخول برقم الهاتف <Phone className="w-5 h-5" />
+          
+          {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-xl mb-6 text-sm font-bold text-center">{error}</div>}
+
+          <button 
+            onClick={handleGoogleLogin} 
+            disabled={loading}
+            className="w-full bg-white text-gray-900 font-bold py-4 rounded-2xl flex justify-center items-center gap-3 transition-transform active:scale-95 shadow-lg"
+          >
+            {loading ? <Loader2 className="w-5 h-5 animate-spin text-brand" /> : (
+              <>
+                <svg className="w-6 h-6" viewBox="0 0 24 24">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                  <path d="M1 1h22v22H1z" fill="none"/>
+                </svg>
+                بدء باستخدام Google
+              </>
+            )}
           </button>
-        </div>
-      )}
-
-      {screen === 'phone_entry' && (
-        <div className="glass-card w-full max-w-sm p-8 rounded-3xl z-10">
-          <button onClick={() => setScreen('welcome')} className="text-white/50 hover:text-white mb-6">← رجوع</button>
-          <h2 className="text-2xl font-black text-white mb-2">تسجيل الدخول / إنشاء حساب</h2>
-          <p className="text-white/50 text-sm mb-6">أدخل رقم هاتفك لتسجيل الدخول أو لإنشاء حساب جديد.</p>
-          {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-xl mb-4 text-sm font-bold text-center">{error}</div>}
-          <form onSubmit={handleSendOtp} className="space-y-4">
-            <div className="relative">
-              <Phone className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
-              <input type="tel" placeholder="05XX XX XX XX" value={phoneNumber}
-                onChange={e => setPhoneNumber(e.target.value)}
-                className="input-ar pl-12 text-left" dir="ltr" />
-            </div>
-            <button type="submit" disabled={loading} className="btn-primary w-full flex justify-center items-center gap-2">
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'المتابعة'}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {screen === 'otp_entry' && (
-        <div className="glass-card w-full max-w-sm p-8 rounded-3xl z-10 text-center">
-          <button onClick={() => setScreen('phone_entry')} className="text-white/50 hover:text-white mb-6 block text-right w-full">← تعديل الرقم</button>
-          <div className="w-16 h-16 bg-brand/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <KeyRound className="w-8 h-8 text-brand" />
-          </div>
-          <h2 className="text-2xl font-black text-white mb-2">تأكيد الرقم</h2>
-          <p className="text-white/50 text-sm mb-6">أدخل رمز التحقق الذي وصلك في رسالة نصية</p>
-          {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-xl mb-4 text-sm font-bold text-center">{error}</div>}
-          <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <div className="relative">
-              <input type="number" placeholder="123456" value={otpCode}
-                onChange={e => setOtpCode(e.target.value)}
-                className="input-ar text-center text-2xl tracking-[0.5em]" dir="ltr" />
-            </div>
-            <button type="submit" disabled={loading} className="btn-primary w-full flex justify-center items-center gap-2">
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'تأكيد الرمز'}
-            </button>
-          </form>
         </div>
       )}
 
       {screen === 'profile_setup' && (
         <div className="glass-card w-full max-w-sm p-8 rounded-3xl z-10 mt-12">
           <h2 className="text-2xl font-black text-white mb-2 text-center">أهلاً بك في تيارت رايد!</h2>
-          <p className="text-white/50 text-sm mb-6 text-center">دعنا نتعرف عليك ونقوم بإكمال ملفك الشخصي</p>
+          <p className="text-white/50 text-sm mb-6 text-center">يبدو أنك مستخدم جديد، أكمل ملفك الشخصي</p>
           {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-xl mb-4 text-sm font-bold text-center">{error}</div>}
           <form onSubmit={handleSaveProfile} className="space-y-4">
             <div>
