@@ -20,9 +20,12 @@ service cloud.firestore {
                     && (request.auth.token.phone_number == driverId || request.auth.uid == driverId)
                     && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['balance', 'freeTrips']));
 
-      // Only admin can create, delete, or update sensitive fields
-      allow create, delete: if request.auth.token.admin == true;
-      allow update: if request.auth.token.admin == true;
+      // Allow driver to create their own profile as 'pending'
+      allow create: if request.resource.data.status == 'pending';
+      
+      // Only admin can delete or update sensitive fields
+      allow delete: if request.auth != null && request.auth.token.admin == true;
+      allow update: if request.auth != null && request.auth.token.admin == true;
     }
 
     // ──────────────────────────────────────────────
