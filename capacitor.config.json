@@ -1,5 +1,16 @@
 {
   "appId": "com.tiaretride.app",
-  "appName": "tiaret-ride-app",
-  "webDir": "dist"
+  "appName": "Tiaret Ride",
+  "webDir": "dist",
+  "server": {
+    "url": "https://bainancedj100-tech.github.io/tiaret-ride-app/",
+    "cleartext": true
+  },
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "serverClientId": "774444004936-xxxxxxxx.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
+  }
 }

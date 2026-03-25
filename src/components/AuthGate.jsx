@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, signInWithCredential } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { Loader2, Car, User, ArrowRight, MapPin } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
 /* ============================================================
    SCREENS:
@@ -79,12 +81,22 @@ const AuthGate = ({ children }) => {
     setLoading(true);
     setError('');
     try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      let credential;
+      if (Capacitor.isNativePlatform()) {
+        // Native Google Login (Fixes disallowed_useragent)
+        const user = await GoogleAuth.signIn();
+        credential = GoogleAuthProvider.credential(user.authentication.idToken);
+        await signInWithCredential(auth, credential);
+      } else {
+        // Standard Web Login
+        const provider = new GoogleAuthProvider();
+        await signInWithPopup(auth, provider);
+      }
       // onAuthStateChanged will handle the auth state update automatically
     } catch (err) {
-      console.error(err);
+      console.error('Login error:', err);
       setError('حدث خطأ أثناء تسجيل الدخول بحساب قوقل.');
+    } finally {
       setLoading(false);
     }
   };
