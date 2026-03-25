@@ -29,11 +29,13 @@ const DriverRegistration = () => {
     carModel: '',
     licensePlate: '',
     // Files
+    profilePicFile: null,
     idFrontFile: null,
     idBackFile: null,
     licenseFile: null,
     vehicleCardFile: null,
     // Previews
+    profilePicPreview: null,
     idFrontPreview: null,
     idBackPreview: null,
     licensePreview: null,
@@ -57,6 +59,9 @@ const DriverRegistration = () => {
       }
       if (form.phone.length < 9) {
         setError('رقم الهاتف غير صحيح'); return false;
+      }
+      if (!form.profilePicFile) {
+        setError('يرجى رفع صورة شخصية'); return false;
       }
     }
     if (step === 2) {
@@ -93,8 +98,9 @@ const DriverRegistration = () => {
     setError('');
 
     try {
-      // Upload all 4 documents
-      const [idFrontUrl, idBackUrl, licenseUrl, vehicleCardUrl] = await Promise.all([
+      // Upload all 5 documents
+      const [profilePicUrl, idFrontUrl, idBackUrl, licenseUrl, vehicleCardUrl] = await Promise.all([
+        uploadDriverDocument(form.profilePicFile, form.phone, 'profile_pic'),
         uploadDriverDocument(form.idFrontFile, form.phone, 'id_front'),
         uploadDriverDocument(form.idBackFile, form.phone, 'id_back'),
         uploadDriverDocument(form.licenseFile, form.phone, 'license'),
@@ -109,6 +115,7 @@ const DriverRegistration = () => {
         nin: form.nin,
         carModel: form.carModel,
         licensePlate: form.licensePlate,
+        profilePicUrl,
         idFrontUrl,
         idBackUrl,
         licenseUrl,
@@ -240,6 +247,9 @@ const DriverRegistration = () => {
                 <input className="input-ar pl-12" placeholder="05XX XX XX XX" dir="ltr"
                   value={form.phone} onChange={e => update('phone', e.target.value)} type="tel" />
               </div>
+            </div>
+            <div className="pt-2">
+              <FileUploadBox label="الصورة الشخصية للسائق" fileField="profilePicFile" previewField="profilePicPreview" icon={User} />
             </div>
           </div>
         )}

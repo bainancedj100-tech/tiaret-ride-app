@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Car, Package, MapPin, Navigation, Loader2, Star, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Map from './Map';
@@ -18,6 +18,37 @@ const RiderHome = () => {
   const [flow, setFlow] = useState('idle');
   const [currentOrderId, setCurrentOrderId] = useState(null);
   const [rating, setRating] = useState(0);
+  const [radius, setRadius] = useState(0.5); // Starts at 0.5 km
+  const [assignedDriverLoc, setAssignedDriverLoc] = useState(null);
+  const driverUnsubRef = useRef(null);
+
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  /* ── Expanding Radius Logic ── */
+  useEffect(() => {
+    let interval;
+    if (flow === 'finding') {
+      interval = setInterval(() => {
+        setRadius(r => {
+          if (r >= 5) {
+            // Reached out of bounds (approx 5km for the municipality)
+            clearInterval(interval);
+            setErrorMsg('لم نتمكن من العثور على سائق ضمن النطاق المتاح حالياً. حاول مرة أخرى.');
+            if (currentOrderId) {
+               import('firebase/firestore').then(({ updateDoc, doc }) => {
+                 updateDoc(doc(db, 'orders', currentOrderId), { status: 'cancelled' }).catch(()=>{});
+               });
+            }
+            return 0.5;
+          }
+          return r + 0.5;
+        });
+      }, 10000);
+    } else {
+      setRadius(0.5);
+    }
+    return () => clearInterval(interval);
+  }, [flow, currentOrderId]);
 
   /* Tap on map → set destination */
   const handleMapClick = React.useCallback((latlng) => {
@@ -35,6 +66,7 @@ const RiderHome = () => {
   const handleRequest = async () => {
     if (!destination) return;
     setFlow('finding');
+    setErrorMsg(null);
     try {
       const ref = await addDoc(collection(db, 'orders'), {
         serviceType,
@@ -48,14 +80,24 @@ const RiderHome = () => {
       const unsub = onSnapshot(doc(db, 'orders', ref.id), (snap) => {
         if (!snap.exists()) return;
         const data = snap.data();
-        if (data.status === 'active') { setFlow('active'); }
-        if (data.status === 'completed') { setFlow('invoice'); unsub(); }
-        if (data.status === 'cancelled') { setFlow('idle'); setCurrentOrderId(null); unsub(); }
+        if (data.status === 'active') { 
+          setFlow('active');
+          if (data.driverId && !driverUnsubRef.current) {
+            driverUnsubRef.current = onSnapshot(doc(db, 'drivers_location', data.driverId), dSnap => {
+              if (dSnap.exists() && dSnap.data().location) setAssignedDriverLoc(dSnap.data().location);
+            });
+          }
+        }
+        if (data.status === 'completed') { setFlow('invoice'); unsub(); clearDriverUnsub(); }
+        if (data.status === 'cancelled') { setFlow('idle'); setCurrentOrderId(null); unsub(); clearDriverUnsub(); }
       });
     } catch {
-      // If Firebase not configured, simulate for demo
       setTimeout(() => setFlow('active'), 3000);
     }
+  };
+
+  const clearDriverUnsub = () => {
+    if (driverUnsubRef.current) { driverUnsubRef.current(); driverUnsubRef.current = null; }
   };
 
   const handleDone = () => {
@@ -65,22 +107,33 @@ const RiderHome = () => {
     setDistance(0);
     setCurrentOrderId(null);
     setRating(0);
+    setAssignedDriverLoc(null);
+    clearDriverUnsub();
   };
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-dark" dir="rtl">
+    <div className="relative w-full h-screen overflow-hidden bg-gray-50" dir="rtl">
       {/* Map (always underneath) */}
-      <Map onMapClick={handleMapClick} destination={destination} />
+      <Map 
+        onMapClick={handleMapClick} 
+        destination={destination} 
+        radius={radius}
+        assignedDriverLoc={assignedDriverLoc}
+        showCircle={flow === 'finding'}
+      />
+
+      {errorMsg && flow === 'idle' && (
+        <div className="absolute top-20 left-4 right-4 z-50 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl shadow-lg flex items-center justify-between" dir="rtl">
+          <p className="text-sm font-bold">{errorMsg}</p>
+          <button onClick={() => setErrorMsg(null)} className="text-red-500 font-bold p-2 hover:bg-red-100 rounded-full">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* ── TOP NAV (idle only) ── */}
       {flow === 'idle' && (
-        <div className="absolute top-4 right-4 left-4 z-20 flex items-center justify-between">
-          <button
-            onClick={() => navigate('/admin')}
-            className="glass-light px-4 py-2 rounded-full text-gray-700 font-bold text-sm shadow-lg flex items-center gap-1.5"
-          >
-            <span className="text-red-500">🛡</span> الإدارة
-          </button>
+        <div className="absolute top-4 right-4 left-4 z-20 flex items-center justify-end">
           <button
             onClick={() => navigate('/driver/register')}
             className="glass-light px-4 py-2 rounded-full text-gray-700 font-bold text-sm shadow-lg flex items-center gap-1.5"

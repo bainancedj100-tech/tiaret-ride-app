@@ -1,156 +1,241 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { listenToAvailableDrivers } from '../services/db';
+import { calculateDistanceKm } from '../utils/pricing';
 
-const Map = ({ onMapClick, destination }) => {
+const TIARET_CENTER = { lat: 35.3725, lng: 1.3204 };
+
+const Map = ({ onMapClick, destination, radius = 0.5, showOrders = false, orders = [], assignedDriverLoc = null, showCircle = false }) => {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
-  const userMarkerRef = useRef(null);
+  const riderMarkerRef = useRef(null);
   const destinationMarkerRef = useRef(null);
   const driverMarkersRef = useRef({});
+  const orderMarkersRef = useRef({});
+  const searchCircleRef = useRef(null);
   const clickHandlerRef = useRef(onMapClick);
   const [drivers, setDrivers] = useState([]);
+  const [userPos, setUserPos] = useState(null);
 
-  // Keep click handler ref updated
-  useEffect(() => {
-    clickHandlerRef.current = onMapClick;
-  }, [onMapClick]);
+  useEffect(() => { clickHandlerRef.current = onMapClick; }, [onMapClick]);
 
-  // Initialize Map
+  // ── 1. Initialize light map ──────────────────────────────────
   useEffect(() => {
     if (!mapInstanceRef.current && window.google) {
-      const tiaretCenter = { lat: 35.371, lng: 1.317 };
-      const darkMapStyle = [
-        { elementType: "geometry", stylers: [{ color: "#1a1f2b" }] },
-        { elementType: "labels.text.stroke", stylers: [{ color: "#1a1f2b" }] },
-        { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-        { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-        { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-        { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
-        { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
-        { featureType: "road", elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-        { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
-        { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
-        { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#4b5563" }] },
-        { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
-        { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
-        { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
-        { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-        { featureType: "water", elementType: "geometry", stylers: [{ color: "#0f172a" }] },
-        { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
-        { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] },
-      ];
-
       mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
-        center: tiaretCenter,
+        center: TIARET_CENTER,
         zoom: 14,
         disableDefaultUI: false,
         zoomControl: true,
-        mapTypeControl: false, // Turn off map type to keep it clean
-        streetViewControl: false, // Turn off street view
-        fullscreenControl: false, // Turn off fullscreen
-        gestureHandling: 'greedy', // 🟢 Fix: One finger panning on mobile
-        styles: darkMapStyle, // Programmatic Dark Mode
-        mapId: 'TIARET_DARK_MAP_ID' // Fallback to Advanced Marker if enabled later
+        gestureHandling: 'greedy',
+        styles: [],
       });
 
-      // Handle Map Click via Ref to avoid listener churn
       mapInstanceRef.current.addListener('click', (e) => {
         if (clickHandlerRef.current) {
           clickHandlerRef.current({ lat: e.latLng.lat(), lng: e.latLng.lng() });
         }
       });
     }
-  }, []); // Only once
-
-  // Track User Location
-  useEffect(() => {
-    if (navigator.geolocation && window.google) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          if (mapInstanceRef.current) {
-            mapInstanceRef.current.setCenter(coords);
-            if (userMarkerRef.current) {
-              userMarkerRef.current.setPosition(coords);
-            } else {
-              userMarkerRef.current = new window.google.maps.Marker({
-                position: coords,
-                map: mapInstanceRef.current,
-                title: "أنت هنا",
-                icon: {
-                  url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
-                }
-              });
-            }
-          }
-        },
-        () => console.warn('Geolocation unavailable')
-      );
-    }
   }, []);
 
-  // Sync Destination Marker
+  // ── 2. Search Circle (Expanding) ──────────────────────────────
   useEffect(() => {
-    if (mapInstanceRef.current && window.google) {
-      if (destination) {
-        const destPos = { lat: destination.lat, lng: destination.lng };
-        if (destinationMarkerRef.current) {
-          destinationMarkerRef.current.setPosition(destPos);
-        } else {
-          destinationMarkerRef.current = new window.google.maps.Marker({
-            position: destPos,
-            map: mapInstanceRef.current,
-            title: "الوجهة",
-            icon: {
-              url: "https://maps.google.com/mapfiles/ms/icons/red-dot.png"
-            }
-          });
-        }
-      } else if (destinationMarkerRef.current) {
-        destinationMarkerRef.current.setMap(null);
-        destinationMarkerRef.current = null;
+    if (!mapInstanceRef.current || !window.google) return;
+
+    if (showCircle && userPos) {
+      if (searchCircleRef.current) {
+        searchCircleRef.current.setMap(mapInstanceRef.current);
+        searchCircleRef.current.setRadius(radius * 1000);
+        searchCircleRef.current.setCenter(userPos);
+      } else {
+        searchCircleRef.current = new window.google.maps.Circle({
+          strokeColor: "#3b82f6",
+          strokeOpacity: 0.8,
+          strokeWeight: 2,
+          fillColor: "#3b82f6",
+          fillOpacity: 0.1,
+          map: mapInstanceRef.current,
+          center: userPos,
+          radius: radius * 1000,
+          clickable: false,
+        });
+      }
+    } else {
+      if (searchCircleRef.current) {
+        searchCircleRef.current.setMap(null);
       }
     }
-  }, [destination]);
+  }, [radius, showCircle, userPos]);
 
-  // Sync Drivers
+  // ── 3. Rider's pulsing location dot ───────────────────────────
+  useEffect(() => {
+    if (!navigator.geolocation || !window.google) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setUserPos(coords);
+      if (mapInstanceRef.current) {
+        if (!searchCircleRef.current) mapInstanceRef.current.setCenter(coords);
+        if (riderMarkerRef.current) riderMarkerRef.current.setMap(null);
+        riderMarkerRef.current = new window.google.maps.Marker({
+          position: coords,
+          map: mapInstanceRef.current,
+          title: "موقعك",
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 8,
+            fillColor: "#3b82f6",
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 2,
+          },
+        });
+      }
+    }, () => {}, { enableHighAccuracy: true });
+  }, []);
+
+  // ── 4. Listen to Drivers & Orders ──────────────────────────────
   useEffect(() => {
     const unsub = listenToAvailableDrivers(setDrivers);
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    if (mapInstanceRef.current && window.google) {
-      // Remove stale markers
-      const currentIds = drivers.map(d => d.id);
-      Object.keys(driverMarkersRef.current).forEach(id => {
-        if (!currentIds.includes(id)) {
-          driverMarkersRef.current[id].setMap(null);
-          delete driverMarkersRef.current[id];
+    if (!mapInstanceRef.current || !window.google) return;
+
+    // Remove stale drivers
+    const currentIds = drivers.map(d => d.id);
+    Object.keys(driverMarkersRef.current).forEach(id => {
+      if (!currentIds.includes(id)) {
+        driverMarkersRef.current[id].setMap(null);
+        delete driverMarkersRef.current[id];
+      }
+    });
+
+    // Update driver markers
+    drivers.forEach(driver => {
+      if (!driver.location) return;
+      
+      const pos = { lat: driver.location.lat, lng: driver.location.lng };
+      
+      // Filter by radius
+      let isWithinRadius = true;
+      if (userPos && radius > 0) {
+        isWithinRadius = calculateDistanceKm(userPos.lat, userPos.lng, pos.lat, pos.lng) <= radius;
+      }
+
+      if (!isWithinRadius) {
+        if (driverMarkersRef.current[driver.id]) {
+          driverMarkersRef.current[driver.id].setMap(null);
+          delete driverMarkersRef.current[driver.id];
+        }
+        return;
+      }
+
+      if (driverMarkersRef.current[driver.id]) {
+        driverMarkersRef.current[driver.id].setPosition(pos);
+      } else {
+        driverMarkersRef.current[driver.id] = new window.google.maps.Marker({
+          position: pos,
+          map: mapInstanceRef.current,
+          title: driver.vehicle || "سائق",
+          icon: {
+            path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+            scale: 5,
+            fillColor: "#f59e0b",
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 1,
+          },
+          label: {
+            text: `🚖 ${driver.vehicle || ''}`,
+            color: "#b45309",
+            fontSize: "10px",
+            fontWeight: "bold",
+            className: "mt-8"
+          }
+        });
+      }
+    });
+
+    // Update order markers if showOrders is true
+    if (showOrders) {
+      const orderIds = orders.map(o => o.id);
+      Object.keys(orderMarkersRef.current).forEach(id => {
+        if (!orderIds.includes(id)) {
+          orderMarkersRef.current[id].setMap(null);
+          delete orderMarkersRef.current[id];
         }
       });
 
-      // Update/Add markers
-      drivers.forEach(driver => {
-        if (driver.location) {
-          const pos = { lat: driver.location.lat, lng: driver.location.lng };
-          if (driverMarkersRef.current[driver.id]) {
-            driverMarkersRef.current[driver.id].setPosition(pos);
-          } else {
-            driverMarkersRef.current[driver.id] = new window.google.maps.Marker({
-              position: pos,
-              map: mapInstanceRef.current,
-              title: driver.name || "سائق",
-              icon: {
-                url: "https://maps.google.com/mapfiles/kml/shapes/cabs.png",
-                scaledSize: new window.google.maps.Size(32, 32)
-              }
-            });
+      orders.forEach(order => {
+        if (!order.destination) return;
+        
+        // Filter by radius
+        let isWithinRadius = true;
+        if (userPos && radius > 0) {
+          isWithinRadius = calculateDistanceKm(userPos.lat, userPos.lng, order.destination.lat, order.destination.lng) <= radius;
+        }
+
+        if (!isWithinRadius) {
+          if (orderMarkersRef.current[order.id]) {
+            orderMarkersRef.current[order.id].setMap(null);
+            delete orderMarkersRef.current[order.id];
           }
+          return;
+        }
+
+        if (!orderMarkersRef.current[order.id]) {
+          orderMarkersRef.current[order.id] = new window.google.maps.Marker({
+            position: order.destination,
+            map: mapInstanceRef.current,
+            title: "طلب جديد",
+            icon: {
+              url: "https://maps.google.com/mapfiles/ms/icons/green-dot.png"
+            }
+          });
         }
       });
     }
-  }, [drivers]);
+  }, [drivers, orders, showOrders]);
+
+  // ── 5. Assigned Driver Tracking (Rider view) ─────────────────
+  const assignedDriverMarkerRef = useRef(null);
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.google) return;
+    if (assignedDriverLoc) {
+      const pos = { lat: assignedDriverLoc.lat, lng: assignedDriverLoc.lng };
+      if (!assignedDriverMarkerRef.current) {
+        assignedDriverMarkerRef.current = new window.google.maps.Marker({
+          position: pos,
+          map: mapInstanceRef.current,
+          title: "السائق",
+          icon: {
+            path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+            scale: 7,
+            fillColor: "#22c55e",
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 2,
+            rotation: 0,
+          },
+          label: {
+            text: "سائقك 🚖",
+            color: "#166534",
+            fontSize: "12px",
+            fontWeight: "bold",
+          },
+          zIndex: 999,
+        });
+      } else {
+        assignedDriverMarkerRef.current.setPosition(pos);
+      }
+    } else {
+      if (assignedDriverMarkerRef.current) {
+        assignedDriverMarkerRef.current.setMap(null);
+        assignedDriverMarkerRef.current = null;
+      }
+    }
+  }, [assignedDriverLoc]);
 
   return (
     <div className="absolute inset-0 w-full h-full z-0">

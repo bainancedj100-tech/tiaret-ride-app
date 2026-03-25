@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, updateDoc, collection, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { updateDriverLocation } from '../services/db';
+import Map from './Map';
 import {
   Car, Navigation, CheckCircle2, WifiOff, AlertTriangle,
   LogIn, Loader2, Phone, Clock, Ban, ShieldCheck
@@ -23,7 +24,22 @@ const DriverDashboard = () => {
   const [isOnline, setIsOnline] = useState(false);
   const [incomingOrder, setIncomingOrder] = useState(null);
   const [activeOrder, setActiveOrder] = useState(null);
+  const [availableOrders, setAvailableOrders] = useState([]);
+  const [radius, setRadius] = useState(0.5);
   const watchRef = useRef(null);
+  
+  // Circle expansion when online and no active order
+  useEffect(() => {
+    let interval;
+    if (isOnline && !activeOrder) {
+      interval = setInterval(() => {
+        setRadius(r => r >= 5 ? 0.5 : r + 0.5);
+      }, 10000);
+    } else {
+      setRadius(0.5);
+    }
+    return () => clearInterval(interval);
+  }, [isOnline, activeOrder]);
 
   /* ── Auto-login from localStorage ── */
   useEffect(() => {
@@ -48,13 +64,14 @@ const DriverDashboard = () => {
     if (!isOnline || driverData?.status !== 'active') return;
     const q = query(collection(db, 'orders'), where('status', '==', 'finding'));
     const unsub = onSnapshot(q, snap => {
-      if (!snap.empty && !activeOrder) {
-        const d = snap.docs[0];
-        setIncomingOrder({ id: d.id, ...d.data() });
+      const ords = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setAvailableOrders(ords);
+      if (ords.length > 0 && !activeOrder && !incomingOrder) {
+        setIncomingOrder(ords[0]);
       }
     });
     return () => unsub();
-  }, [isOnline, activeOrder, driverData?.status]);
+  }, [isOnline, activeOrder, driverData?.status, incomingOrder]);
 
   /* ── Live GPS tracking ── */
   useEffect(() => {
@@ -242,92 +259,110 @@ const DriverDashboard = () => {
   const freeLeft = driverData.freeTrips ?? 0;
 
   return (
-    <div className="h-[100dvh] bg-dark overflow-y-auto pb-10 flex flex-col p-5 pt-12 max-w-md mx-auto relative" dir="rtl">
-      <div className="absolute -top-32 -right-32 w-96 h-96 bg-brand/10 rounded-full blur-3xl pointer-events-none" />
-
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8 z-10">
-        <div>
-          <h1 className="text-2xl font-black text-white">مرحباً، {driverData.firstName}</h1>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <ShieldCheck className="w-4 h-4 text-green-400" />
-            <span className="text-green-400 text-xs font-bold">حساب معتمد</span>
+    <div className="relative w-full h-[100dvh] overflow-hidden bg-gray-50" dir="rtl">
+      {/* Background Map Overlay */}
+      <Map 
+        onMapClick={() => {}} 
+        destination={null} 
+        radius={isOnline && !activeOrder ? radius : 0}
+        showOrders={isOnline && !activeOrder}
+        orders={availableOrders}
+        showCircle={isOnline && !activeOrder}
+      />
+      
+      {/* Overlay UI */}
+      <div className="absolute inset-x-0 bottom-0 pointer-events-none flex flex-col p-5 pb-10 max-w-md mx-auto h-full justify-between">
+        
+        {/* Header (Top) */}
+        <div className="flex items-center justify-between z-10 pointer-events-auto bg-white/80 backdrop-blur-md rounded-2xl p-4 shadow-sm mt-4">
+          <div>
+            <h1 className="text-xl font-black text-gray-900">مرحباً، {driverData.firstName}</h1>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <ShieldCheck className="w-4 h-4 text-green-500" />
+              <span className="text-green-600 text-xs font-bold">حساب معتمد</span>
+            </div>
+          </div>
+          <div className="relative w-12 h-12 bg-brand/10 rounded-2xl flex items-center justify-center overflow-hidden border-2 border-brand/20">
+            {driverData?.profilePicUrl ? (
+              <img src={driverData.profilePicUrl} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xl font-black text-brand">{driverData?.firstName?.charAt(0)}</span>
+            )}
+            <div className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
           </div>
         </div>
-        <div className="w-12 h-12 bg-brand/20 rounded-2xl flex items-center justify-center">
-          <span className="text-xl font-black text-brand">{driverData.firstName?.charAt(0)}</span>
-        </div>
-      </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-4 mb-6 z-10">
-        <div className="glass-card rounded-2xl p-5">
-          <p className="text-white/50 text-xs font-bold uppercase tracking-wider mb-1">رحلات مجانية</p>
-          <p className="text-3xl font-black text-brand">{freeLeft}</p>
-          <p className="text-white/30 text-xs mt-1">من 3 رحلات</p>
-        </div>
-        <div className="glass-card rounded-2xl p-5">
-          <p className="text-white/50 text-xs font-bold uppercase tracking-wider mb-1">الرصيد</p>
-          <p className="text-3xl font-black text-white">{driverData.balance || 0}</p>
-          <p className="text-white/30 text-xs mt-1">دينار جزائري</p>
-        </div>
-      </div>
-
-      {/* Online/Offline Card */}
-      <div className="glass-card rounded-[28px] p-6 flex-1 flex flex-col items-center justify-center text-center z-10 min-h-[300px]">
-        {activeOrder ? (
-          <div className="w-full animate-fade-in">
-            <div className="w-16 h-16 bg-green-400/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Navigation className="w-8 h-8 text-green-400" />
+        {/* Bottom Cards Area */}
+        <div className="pointer-events-auto mt-auto flex flex-col gap-4">
+          {/* Stats Bar */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="glass-light rounded-2xl p-4 shadow-sm">
+              <p className="text-gray-500 text-xs font-bold uppercase mb-1">رحلات مجانية</p>
+              <p className="text-2xl font-black text-brand">{freeLeft}</p>
             </div>
-            <h2 className="text-xl font-black text-white mb-1">رحلة نشطة</h2>
-            <p className="text-white/50 text-sm mb-4">أنت في طريقك للزبون</p>
-            <div className="bg-white/5 rounded-2xl p-4 mb-6 text-right">
-              <p className="text-white/50 text-xs mb-1">السعر</p>
-              <p className="text-2xl font-black text-white">{activeOrder.price} دج</p>
+            <div className="glass-light rounded-2xl p-4 shadow-sm">
+              <p className="text-gray-500 text-xs font-bold uppercase mb-1">الرصيد</p>
+              <p className="text-2xl font-black text-gray-900">{driverData.balance || 0} دج</p>
             </div>
-            <button onClick={handleCompleteOrder}
-              className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl transition-all active:scale-95">
-              تأكيد إتمام الرحلة ✓
-            </button>
           </div>
-        ) : isOnline ? (
-          <div className="animate-fade-in flex flex-col items-center">
-            <div className="relative w-32 h-32 mb-6">
-              <div className="absolute inset-0 bg-brand/20 rounded-full animate-ping" />
-              <div className="absolute inset-3 bg-brand/40 rounded-full animate-ping" style={{ animationDelay: '0.25s' }} />
-              <div className="absolute inset-7 bg-brand rounded-full flex items-center justify-center shadow-xl">
-                <Navigation className="w-8 h-8 text-white" />
+
+          {/* Active / Offline Card */}
+          <div className="glass-light rounded-[28px] p-5 shadow-lg w-full">
+            {activeOrder ? (
+              <div className="w-full animate-fade-in text-gray-900 text-center">
+                <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-green-200">
+                  <Navigation className="w-8 h-8 text-green-600" />
+                </div>
+                <h2 className="text-xl font-black mb-1">رحلة نشطة</h2>
+                <p className="text-gray-500 text-sm mb-4">أنت في طريقك للزبون</p>
+                <div className="bg-gray-100 rounded-2xl p-4 mb-4 flex justify-between items-center text-right">
+                  <p className="text-gray-500 text-xs font-bold">المبلغ المستحق</p>
+                  <p className="text-2xl font-black text-brand">{activeOrder.price} دج</p>
+                </div>
+                <button onClick={handleCompleteOrder}
+                  className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl transition-all shadow-md active:scale-95">
+                  تأكيد إتمام الرحلة ✓
+                </button>
               </div>
-            </div>
-            <h2 className="text-xl font-black text-white mb-1">أنت متصل</h2>
-            <p className="text-white/50 mb-8">تبحث عن الطلبات في تيارت...</p>
-            <button onClick={() => setIsOnline(false)}
-              className="px-8 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl transition-all flex items-center gap-2">
-              <WifiOff className="w-5 h-5" /> قطع الاتصال
-            </button>
+            ) : isOnline ? (
+              <div className="animate-fade-in flex flex-col items-center">
+                <div className="relative w-24 h-24 mb-4">
+                  <div className="absolute inset-0 bg-brand/10 rounded-full animate-ping" />
+                  <div className="absolute inset-3 bg-brand/20 rounded-full animate-ping" style={{ animationDelay: '0.2s' }} />
+                  <div className="absolute inset-5 bg-brand rounded-full flex items-center justify-center shadow-lg">
+                    <Navigation className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+                <h2 className="text-lg font-black text-gray-900 mb-1">أنت متصل بالإنترنت</h2>
+                <p className="text-gray-500 text-sm mb-5">دائرة البحث تتسع للعثور على زبائن (قطر {radius} كم)...</p>
+                <button onClick={() => setIsOnline(false)}
+                  className="w-full py-3 bg-red-50 text-red-600 font-bold rounded-2xl transition-all flex justify-center items-center gap-2 border border-red-100 hover:bg-red-100">
+                  <WifiOff className="w-5 h-5" /> التوقف مؤقتاً
+                </button>
+              </div>
+            ) : (
+              <div className="animate-fade-in flex flex-col items-center">
+                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <Car className="w-10 h-10 text-gray-400" />
+                </div>
+                <h2 className="text-lg font-bold text-gray-900 mb-1">التطبيق متوقف</h2>
+                <p className="text-gray-500 text-sm mb-5">شغّل الاتصال لتبدأ مسح الخريطة وقبول الطلبات</p>
+                <button onClick={() => setIsOnline(true)}
+                  className="w-full bg-gray-900 text-white flex items-center justify-center gap-3 py-4 rounded-2xl font-black shadow-lg">
+                  <CheckCircle2 className="w-6 h-6" /> تشغيل النظام والبدء
+                </button>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="animate-fade-in flex flex-col items-center">
-            <div className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center mb-6">
-              <Car className="w-12 h-12 text-white/40" />
-            </div>
-            <h2 className="text-xl font-bold text-white mb-1">أنت غير متصل</h2>
-            <p className="text-white/40 mb-8">شغّل الاتصال لتبدأ قبول الطلبات</p>
-            <button onClick={() => setIsOnline(true)}
-              className="w-full btn-primary flex items-center justify-center gap-3 py-5 text-lg">
-              <CheckCircle2 className="w-6 h-6" /> تشغيل والبدء بالعمل
-            </button>
-          </div>
-        )}
-      </div>
+        </div>
 
-      {/* Logout */}
-      <button
-        onClick={() => { localStorage.removeItem('tiaret_driver_phone'); setIsLoggedIn(false); setPhone(''); setDriverData(undefined); }}
-        className="mt-4 text-white/30 text-xs text-center hover:text-white/60 transition-colors z-10">
-        تسجيل خروج
-      </button>
+        {/* Logout */}
+        <button
+          onClick={() => { localStorage.removeItem('tiaret_driver_phone'); setIsLoggedIn(false); setPhone(''); setDriverData(undefined); }}
+          className="mt-6 mb-2 pointer-events-auto text-gray-400 text-xs text-center font-bold hover:text-gray-600 transition-colors bg-white/50 py-2 rounded-full mx-auto px-6">
+          تسجيل خروج
+        </button>
+      </div>
 
       {/* ── INCOMING ORDER POPUP ── */}
       {incomingOrder && !activeOrder && (
