@@ -6,7 +6,7 @@ import {
   UserCheck, UserX, TrendingUp, Clock
 } from 'lucide-react';
 import {
-  collection, onSnapshot, doc, updateDoc, query, where, orderBy
+  collection, onSnapshot, doc, updateDoc, query, where, orderBy, deleteDoc
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
@@ -72,6 +72,16 @@ const AdminDashboard = () => {
   // ── Driver Actions ──
   const setDriverStatus = async (phone, status) => {
     await updateDoc(doc(db, 'drivers', phone), { status });
+  };
+
+  const deleteOrder = async (orderId) => {
+    if (window.confirm('هل أنت متأكد من حذف هذا الطلب نهائياً لتنظيف القائمة؟')) {
+      try {
+        await deleteDoc(doc(db, 'orders', orderId));
+      } catch (err) {
+        alert('حدث خطأ أثناء الحذف أو ليس لديك صلاحية.');
+      }
+    }
   };
 
   const startEdit = (driver) => {
@@ -420,10 +430,14 @@ const AdminDashboard = () => {
                       {order.driverId && <p className="text-xs text-gray-400">السائق: {order.driverId}</p>}
                       <p className="text-xs text-gray-400 mt-0.5">{order.id}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="flex flex-col items-end gap-2 text-right">
                       <p className="text-xs text-gray-400">
                         {order.createdAt ? new Date(order.createdAt).toLocaleString('ar-DZ') : ''}
                       </p>
+                      <button onClick={() => deleteOrder(order.id)} 
+                        className="flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm">
+                        <XCircle className="w-3 h-3" /> حذف
+                      </button>
                     </div>
                   </div>
                 </div>

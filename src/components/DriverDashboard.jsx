@@ -71,7 +71,7 @@ const DriverDashboard = () => {
     return () => unsub();
   }, [isOnline, driverData?.status]);
 
-  /* ── Distance & Sorting ── */
+  /* ── Distance, Filtering & Sorting ── */
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
     if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
     const p = 0.017453292519943295; // Math.PI / 180
@@ -80,11 +80,18 @@ const DriverDashboard = () => {
     return 12742 * Math.asin(Math.sqrt(a)); // 2 * R; R = 6371 km
   };
 
-  const sortedOrders = [...availableOrders].sort((a, b) => {
-    const distA = calculateDistance(currentLocation?.lat, currentLocation?.lng, a.origin?.lat, a.origin?.lng);
-    const distB = calculateDistance(currentLocation?.lat, currentLocation?.lng, b.origin?.lat, b.origin?.lng);
-    return distA - distB;
-  });
+  const sortedOrders = [...availableOrders]
+    .filter(order => {
+      // Auto-hide orders older than 15 minutes (900000ms)
+      if (!order.createdAt) return true;
+      const orderTime = new Date(order.createdAt).getTime();
+      return (Date.now() - orderTime) < 900000;
+    })
+    .sort((a, b) => {
+      const distA = calculateDistance(currentLocation?.lat, currentLocation?.lng, a.origin?.lat, a.origin?.lng);
+      const distB = calculateDistance(currentLocation?.lat, currentLocation?.lng, b.origin?.lat, b.origin?.lng);
+      return distA - distB;
+    });
 
   /* ── Live GPS tracking ── */
   useEffect(() => {
