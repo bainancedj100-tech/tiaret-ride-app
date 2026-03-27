@@ -5,7 +5,7 @@ import { updateDriverLocation } from '../services/db';
 import Map from './Map';
 import {
   Car, Navigation, CheckCircle2, WifiOff, AlertTriangle,
-  LogIn, Loader2, Phone, Clock, Ban, ShieldCheck
+  LogIn, Loader2, Phone, Clock, Ban, ShieldCheck, MapPin
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════
@@ -26,6 +26,7 @@ const DriverDashboard = () => {
   const [activeOrder, setActiveOrder] = useState(null);
   const [availableOrders, setAvailableOrders] = useState([]);
   const [radius, setRadius] = useState(0.5);
+  const [currentLocation, setCurrentLocation] = useState(null);
   const watchRef = useRef(null);
   
   // Circle expansion when online and no active order
@@ -66,12 +67,24 @@ const DriverDashboard = () => {
     const unsub = onSnapshot(q, snap => {
       const ords = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setAvailableOrders(ords);
-      if (ords.length > 0 && !activeOrder && !incomingOrder) {
-        setIncomingOrder(ords[0]);
-      }
     });
     return () => unsub();
-  }, [isOnline, activeOrder, driverData?.status, incomingOrder]);
+  }, [isOnline, driverData?.status]);
+
+  /* ── Distance & Sorting ── */
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+    const p = 0.017453292519943295; // Math.PI / 180
+    const c = Math.cos;
+    const a = 0.5 - c((lat2 - lat1) * p) / 2 + c(lat1 * p) * c(lat2 * p) * (1 - c((lon2 - lon1) * p)) / 2;
+    return 12742 * Math.asin(Math.sqrt(a)); // 2 * R; R = 6371 km
+  };
+
+  const sortedOrders = [...availableOrders].sort((a, b) => {
+    const distA = calculateDistance(currentLocation?.lat, currentLocation?.lng, a.origin?.lat, a.origin?.lng);
+    const distB = calculateDistance(currentLocation?.lat, currentLocation?.lng, b.origin?.lat, b.origin?.lng);
+    return distA - distB;
+  });
 
   /* ── Live GPS tracking ── */
   useEffect(() => {
@@ -79,6 +92,7 @@ const DriverDashboard = () => {
       watchRef.current = navigator.geolocation.watchPosition(
         async pos => {
           try {
+            setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
             await updateDriverLocation(phone, { lat: pos.coords.latitude, lng: pos.coords.longitude }, {
               name: driverData.firstName,
               vehicle: driverData.vehicle || 'سيارة عادية'
@@ -269,6 +283,44 @@ const DriverDashboard = () => {
         orders={availableOrders}
         showCircle={isOnline && !activeOrder}
       />
+      
+      {/* ── ORDERS LIST (Left Side Overlay - New Feature) ── */}
+      {isOnline && !activeOrder && sortedOrders.length > 0 && (
+        <div className="absolute top-4 left-4 w-72 max-h-[50vh] overflow-y-auto bg-white/95 backdrop-blur-xl rounded-2xl p-3 shadow-2xl z-20 pointer-events-auto border border-gray-100">
+          <div className="flex items-center justify-between mb-3 border-b pb-2">
+            <h3 className="font-black text-gray-900 text-lg">الطلبات المتاحة 🚕</h3>
+            <span className="bg-brand text-white px-2 py-0.5 rounded-full text-[10px] font-black shadow-sm">{sortedOrders.length}</span>
+          </div>
+          
+          <div className="flex flex-col gap-2.5">
+            {sortedOrders.map((order) => {
+              const dist = calculateDistance(currentLocation?.lat, currentLocation?.lng, order.origin?.lat, order.origin?.lng);
+              return (
+                <div key={order.id} 
+                  className="bg-gray-50 rounded-xl p-3 border border-gray-200 hover:border-brand hover:shadow-md cursor-pointer transition-all active:scale-[0.98]"
+                  onClick={() => setIncomingOrder(order)}>
+                  
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-[10px] font-black bg-white px-2 py-1 rounded-lg text-brand shadow-sm border border-gray-100">
+                      {dist === Infinity ? 'يُحسب...' : `${dist.toFixed(1)} كم`}
+                    </span>
+                    <span className="font-black text-gray-900 text-base">{order.price} دج</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-1.5 mb-1.5 opacity-80">
+                    <div className="w-2 h-2 rounded-full bg-green-500 shadow-sm" />
+                    <p className="text-xs font-bold text-gray-800 line-clamp-1 w-44">{order.origin?.name || 'موقع الزبون'}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 opacity-60">
+                    <div className="w-2 h-2 rounded-full bg-brand shadow-sm" />
+                    <p className="text-[10px] font-bold text-gray-600 line-clamp-1 w-44">{order.destination?.name || 'الوجهة'}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       
       {/* Overlay UI */}
       <div className="absolute inset-x-0 bottom-0 pointer-events-none flex flex-col p-5 pb-10 max-w-md mx-auto h-full justify-between">

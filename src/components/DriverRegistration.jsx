@@ -5,7 +5,7 @@ import { uploadDriverDocument } from '../services/storage';
 import { useNavigate } from 'react-router-dom';
 import {
   Car, User, Phone, Hash, CreditCard, Upload,
-  CheckCircle2, Loader2, ArrowRight, FileText, ShieldCheck
+  CheckCircle2, Loader2, ArrowRight, FileText, ShieldCheck, MessageCircle
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════
@@ -159,11 +159,11 @@ const DriverRegistration = () => {
           </p>
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 mb-6">
             <p className="text-amber-300 text-sm font-bold">⏳ حالة الحساب: قيد المراجعة</p>
-            <p className="text-white/50 text-xs mt-1">يرجى التحقق لاحقاً بعد تواصلك مع الإدارة</p>
+            <p className="text-white/50 text-xs mt-1">يرجى التواصل مع الإدارة عبر واتساب لتفعيل حسابك</p>
           </div>
-          <button onClick={() => navigate('/driver/dashboard')} className="btn-primary w-full">
-            متابعة للوحة السائق
-          </button>
+          <a href="https://wa.me/213658592909" target="_blank" rel="noreferrer" className="btn-primary w-full flex items-center justify-center gap-2">
+            تواصل عبر واتساب <MessageCircle className="w-5 h-5" />
+          </a>
         </div>
       </div>
     );
