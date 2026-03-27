@@ -1,13 +1,12 @@
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../firebase/config";
-
 /**
- * Compress image using Canvas API
+ * Compress image and convert directly to Base64 (Data URI)
+ * Bypassing Firebase Storage completely to avoid billing/CORS issues.
+ * Images are shrunk heavily and saved as text strings in Firestore.
  */
-const compressImage = (file, maxWidth = 1024, quality = 0.7) => {
+const compressImageToBase64 = (file, maxWidth = 800, quality = 0.5) => {
   return new Promise((resolve) => {
     if (!file || !file.type.startsWith('image/')) {
-      resolve(file);
+      resolve(null);
       return;
     }
 
@@ -31,43 +30,32 @@ const compressImage = (file, maxWidth = 1024, quality = 0.7) => {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
 
-        canvas.toBlob((blob) => {
-          const compressedFile = new File([blob], file.name, {
-            type: 'image/jpeg',
-            lastModified: Date.now(),
-          });
-          resolve(compressedFile);
-        }, 'image/jpeg', quality);
+        // Convert the canvas graphic directly to a lightweight Base64 string
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
       };
-      img.onerror = () => resolve(file);
+      img.onerror = () => resolve(null);
     };
-    reader.onerror = () => resolve(file);
+    reader.onerror = () => resolve(null);
   });
 };
 
 /**
- * Upload a driver document image to Firebase Storage.
- * @param {File}   file         - The file to upload
- * @param {string} phone        - Driver phone (used as folder)
- * @param {string} documentType - 'id_front' | 'id_back' | 'license' | 'vehicle_card'
- * @returns {string|null} Download URL or null if failed
+ * Encode driver document as Base64 string for direct Firestore entry.
+ * @param {File}   file         - The file to encode
+ * @param {string} phone        - Driver phone (unused now but kept for signature)
+ * @param {string} documentType - Document type (unused now)
+ * @returns {string|null}      Base64 string or null
  */
 export const uploadDriverDocument = async (file, phone, documentType) => {
   if (!file) return null;
   
-  // 1. Compress the image before uploading (Reduces size from ~5MB to ~300KB)
-  const compressedFile = await compressImage(file, 1024, 0.7);
-
-  const storageRef = ref(
-    storage,
-    `driver_documents/${phone}/${documentType}_${Date.now()}`
-  );
   try {
-    const snapshot = await uploadBytes(storageRef, compressedFile);
-    return await getDownloadURL(snapshot.ref);
+    // Compress and get Data URL
+    const base64String = await compressImageToBase64(file, 800, 0.5);
+    return base64String;
   } catch (error) {
-    console.error(`Error uploading ${documentType}:`, error);
-    // Return local object URL as fallback when Storage isn't configured
-    return URL.createObjectURL(file);
+    console.error(`Error encoding ${documentType}:`, error);
+    return null;
   }
 };
