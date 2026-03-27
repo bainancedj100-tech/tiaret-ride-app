@@ -18,6 +18,7 @@ const DriverRegistration = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
 
@@ -95,6 +96,7 @@ const DriverRegistration = () => {
   const handleSubmit = async () => {
     if (!validateStep()) return;
     setLoading(true);
+    setLoadingMsg('جاري تحضير وضغط الصور 📸...');
     setError('');
 
     try {
@@ -107,6 +109,7 @@ const DriverRegistration = () => {
         uploadDriverDocument(form.vehicleCardFile, form.phone, 'vehicle_card'),
       ]);
 
+      setLoadingMsg('جاري حفظ الملف وإعداد حسابك ⚙️...');
       // Save as 'pending' in drivers collection
       await setDoc(doc(db, 'drivers', form.phone), {
         firstName: form.firstName,
@@ -137,6 +140,7 @@ const DriverRegistration = () => {
     }
 
     setLoading(false);
+    setLoadingMsg('');
     setSubmitted(true);
   };
 
@@ -315,7 +319,12 @@ const DriverRegistration = () => {
               </button>
             : <button onClick={handleSubmit} disabled={loading}
                 className="btn-primary w-full flex items-center justify-center gap-2">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>إرسال الطلب <CheckCircle2 className="w-5 h-5" /></>}
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="font-bold text-sm tracking-wide">{loadingMsg || 'جاري المعالجة...'}</span>
+                  </>
+                ) : <>إرسال الطلب <CheckCircle2 className="w-5 h-5" /></>}
               </button>
           }
           {step > 1 && (
