@@ -265,10 +265,10 @@ const AdminDashboard = () => {
                       <div key={label} className="flex flex-col items-center gap-1">
                         <p className="text-xs text-gray-500 font-bold text-center">{label}</p>
                         {url ? (
-                          <a href={url} target="_blank" rel="noreferrer">
+                          <button onClick={() => setDocModal(url)} className="focus:outline-none w-full">
                             <img src={url} alt={label}
                               className="w-full h-16 object-cover rounded-lg border border-gray-200 hover:scale-105 transition-transform cursor-zoom-in shadow-sm" />
-                          </a>
+                          </button>
                         ) : (
                           <div className="w-full h-16 bg-gray-100 rounded-lg flex items-center justify-center border border-dashed border-gray-300">
                             <span className="text-gray-400 text-xs">غير متوفر</span>
@@ -384,10 +384,10 @@ const AdminDashboard = () => {
                         { url: driver.licenseUrl,    label: 'رخصة' },
                         { url: driver.vehicleCardUrl,label: 'رماد' },
                       ].map(({ url, label }) => url && (
-                        <a key={label} href={url} target="_blank" rel="noreferrer">
+                        <button key={label} onClick={() => setDocModal(url)} className="focus:outline-none">
                           <img src={url} alt={label}
-                            className="w-14 h-10 object-cover rounded-lg border border-gray-200 hover:scale-110 transition-transform cursor-zoom-in" />
-                        </a>
+                            className="w-14 h-10 object-cover rounded-lg border border-gray-200 hover:scale-110 transition-transform cursor-zoom-in shadow-sm" />
+                        </button>
                       ))}
                     </div>
                   )}
@@ -447,6 +447,19 @@ const AdminDashboard = () => {
         )}
 
       </div>
+
+      {/* ── FULLSCREEN IMAGE MODAL ── */}
+      {docModal && (
+        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md cursor-zoom-out"
+          onClick={() => setDocModal(null)}>
+          <button className="absolute top-6 right-6 text-white/70 hover:text-white bg-white/10 hover:bg-red-500/50 rounded-full p-2 transition-all">
+            <XCircle className="w-8 h-8" />
+          </button>
+          <img src={docModal} alt="Enlarged Document" 
+            className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl animate-fade-in"
+            onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   );
 };
