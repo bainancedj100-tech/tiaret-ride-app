@@ -1,36 +1,17 @@
 import React, { useEffect } from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
-import { PushNotifications } from '@capacitor/push-notifications';
 import Home from './components/Home';
 import DriverRegistration from './components/DriverRegistration';
 import AdminDashboard from './components/AdminDashboard';
 import DriverDashboard from './components/DriverDashboard';
 import AuthGate from './components/AuthGate';
 import AdminGuard from './components/AdminGuard';
+import Profile from './components/Profile';
 
 function App() {
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      const registerPush = async () => {
-        let permStatus = await PushNotifications.checkPermissions();
-        if (permStatus.receive === 'prompt') {
-          permStatus = await PushNotifications.requestPermissions();
-        }
-        if (permStatus.receive !== 'granted') return;
-        
-        await PushNotifications.register();
-        
-        PushNotifications.addListener('registration', (token) => {
-          console.log('Push registration success, token: ' + token.value);
-        });
-
-        PushNotifications.addListener('pushNotificationReceived', (notification) => {
-          console.log('Push received: ', notification);
-        });
-      };
-      registerPush().catch(console.error);
-    }
+    // Native Push Notifications disabled because it requires google-services.json
   }, []);
 
   return (
@@ -46,7 +27,13 @@ function App() {
           <Route path="/driver/register" element={<DriverRegistration />} />
           <Route path="/driver/dashboard" element={<DriverDashboard />} />
 
-          {/* All other routes → AuthGate → Rider Home */}
+          {/* All other routes → AuthGate */}
+          <Route path="/profile" element={
+            <AuthGate>
+              <Profile />
+            </AuthGate>
+          } />
+          
           <Route path="/*" element={
             <AuthGate>
               <Home />

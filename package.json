@@ -15,7 +15,6 @@
   "dependencies": {
     "@capacitor/android": "^8.2.0",
     "@capacitor/core": "^8.2.0",
-    "@capacitor/push-notifications": "^8.0.2",
     "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
     "firebase": "^12.10.0",
     "leaflet": "^1.9.4",

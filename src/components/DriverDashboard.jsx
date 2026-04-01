@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { doc, onSnapshot, updateDoc, collection, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { updateDriverLocation } from '../services/db';
@@ -18,12 +19,15 @@ import {
    - Incoming order popup
 ═══════════════════════════════════════════════════ */
 const DriverDashboard = () => {
+  const navigate = useNavigate();
   const [phone, setPhone] = useState('');
+  const [driverId, setDriverId] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [driverData, setDriverData] = useState(undefined); // undefined = loading
   const [isOnline, setIsOnline] = useState(false);
   const [incomingOrder, setIncomingOrder] = useState(null);
   const [activeOrder, setActiveOrder] = useState(null);
+  const [rideState, setRideState] = useState('going_to_customer'); // 'going_to_customer' | 'in_route'
   const [availableOrders, setAvailableOrders] = useState([]);
   const [radius, setRadius] = useState(0.5);
   const [currentLocation, setCurrentLocation] = useState(null);
@@ -54,8 +58,16 @@ const DriverDashboard = () => {
   /* ── Listen to driver profile from Firestore ── */
   useEffect(() => {
     if (!isLoggedIn || !phone) return;
-    const unsub = onSnapshot(doc(db, 'drivers', phone), snap => {
-      setDriverData(snap.exists() ? snap.data() : null);
+    const q = query(collection(db, 'drivers'), where('phone', '==', phone));
+    const unsub = onSnapshot(q, snap => {
+      if (!snap.empty) {
+        const d = snap.docs[0];
+        setDriverId(d.id);
+        setDriverData(d.data());
+      } else {
+        setDriverId(null);
+        setDriverData(null);
+      }
     });
     return () => unsub();
   }, [isLoggedIn, phone]);
@@ -100,10 +112,12 @@ const DriverDashboard = () => {
         async pos => {
           try {
             setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-            await updateDriverLocation(phone, { lat: pos.coords.latitude, lng: pos.coords.longitude }, {
-              name: driverData.firstName,
-              vehicle: driverData.vehicle || 'سيارة عادية'
-            });
+            if (driverId) {
+              await updateDriverLocation(driverId, { lat: pos.coords.latitude, lng: pos.coords.longitude }, {
+                name: driverData.firstName,
+                vehicle: driverData.vehicle || 'سيارة عادية'
+              });
+            }
           } catch { /* offline ok */ }
         },
         () => {},
@@ -111,8 +125,8 @@ const DriverDashboard = () => {
       );
     } else {
       if (watchRef.current) navigator.geolocation.clearWatch(watchRef.current);
-      if (phone && !isOnline) {
-        updateDriverLocation(phone, null).catch(() => {});
+      if (driverId && !isOnline) {
+        updateDriverLocation(driverId, null).catch(() => {});
       }
     }
     return () => { if (watchRef.current) navigator.geolocation.clearWatch(watchRef.current); };
@@ -120,16 +134,17 @@ const DriverDashboard = () => {
 
   /* ── Accept order ── */
   const handleAccept = async () => {
-    if (!incomingOrder) return;
+    if (!incomingOrder || !driverId) return;
     try {
-      await updateDoc(doc(db, 'orders', incomingOrder.id), { status: 'active', driverId: phone });
+      await updateDoc(doc(db, 'orders', incomingOrder.id), { status: 'active', driverId: phone, rideState: 'going_to_customer' });
       // Deduct
       if (driverData?.freeTrips > 0) {
-        await updateDoc(doc(db, 'drivers', phone), { freeTrips: driverData.freeTrips - 1 });
+        await updateDoc(doc(db, 'drivers', driverId), { freeTrips: driverData.freeTrips - 1 });
       } else if ((driverData?.balance || 0) > 0) {
-        await updateDoc(doc(db, 'drivers', phone), { balance: driverData.balance - 50 });
+        await updateDoc(doc(db, 'drivers', driverId), { balance: driverData.balance - 50 });
       }
     } catch { /* offline */ }
+    setRideState('going_to_customer');
     setActiveOrder(incomingOrder);
     setIncomingOrder(null);
   };
@@ -196,7 +211,7 @@ const DriverDashboard = () => {
           <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-black text-white mb-2">الحساب غير موجود</h2>
           <p className="text-white/50 mb-6">رقم هاتفك غير مسجل في النظام. يرجى التسجيل أولاً.</p>
-          <button onClick={() => { localStorage.removeItem('tiaret_driver_phone'); setIsLoggedIn(false); setPhone(''); }}
+          <button onClick={() => { localStorage.removeItem('tiaret_driver_phone'); setIsLoggedIn(false); setPhone(''); navigate('/driver/register'); }}
             className="btn-ghost w-full">تسجيل جديد</button>
         </div>
       </div>
@@ -289,6 +304,9 @@ const DriverDashboard = () => {
         showOrders={isOnline && !activeOrder}
         orders={availableOrders}
         showCircle={isOnline && !activeOrder}
+        routeOrigin={activeOrder ? (rideState === 'going_to_customer' ? currentLocation : (activeOrder.origin || currentLocation)) : null}
+        routeDestination={activeOrder ? (rideState === 'going_to_customer' ? (activeOrder.origin || activeOrder.destination) : activeOrder.destination) : null}
+        userLoc={currentLocation}
       />
       
       {/* ── ORDERS LIST (Left Side Overlay - New Feature) ── */}
@@ -373,15 +391,27 @@ const DriverDashboard = () => {
                   <Navigation className="w-8 h-8 text-green-600" />
                 </div>
                 <h2 className="text-xl font-black mb-1">رحلة نشطة</h2>
-                <p className="text-gray-500 text-sm mb-4">أنت في طريقك للزبون</p>
+                <p className="text-gray-500 text-sm mb-4">
+                  {rideState === 'going_to_customer' ? 'أنت في طريقك للزبون 🚙' : 'أنت في طريقك لوجهة الزبون 📍'}
+                </p>
                 <div className="bg-gray-100 rounded-2xl p-4 mb-4 flex justify-between items-center text-right">
                   <p className="text-gray-500 text-xs font-bold">المبلغ المستحق</p>
                   <p className="text-2xl font-black text-brand">{activeOrder.price} دج</p>
                 </div>
-                <button onClick={handleCompleteOrder}
-                  className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl transition-all shadow-md active:scale-95">
-                  تأكيد إتمام الرحلة ✓
-                </button>
+                {rideState === 'going_to_customer' ? (
+                  <button onClick={async () => {
+                      setRideState('in_route');
+                      try { await updateDoc(doc(db, 'orders', activeOrder.id), { rideState: 'in_route' }); } catch { }
+                    }}
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-l from-brand to-[#1d4ed8] hover:shadow-lg hover:-translate-y-0.5 text-white font-black py-4 rounded-2xl transition-all shadow-md active:scale-95">
+                    الوصول للزبون وبدء الرحلة 🏁
+                  </button>
+                ) : (
+                  <button onClick={handleCompleteOrder}
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-l from-green-500 to-[#15803d] hover:shadow-lg hover:-translate-y-0.5 text-white font-black py-4 rounded-2xl transition-all shadow-md active:scale-95">
+                    تأكيد إتمام الرحلة ✓
+                  </button>
+                )}
               </div>
             ) : isOnline ? (
               <div className="animate-fade-in flex flex-col items-center">
@@ -395,7 +425,7 @@ const DriverDashboard = () => {
                 <h2 className="text-lg font-black text-gray-900 mb-1">أنت متصل بالإنترنت</h2>
                 <p className="text-gray-500 text-sm mb-5">دائرة البحث تتسع للعثور على زبائن (قطر {radius} كم)...</p>
                 <button onClick={() => setIsOnline(false)}
-                  className="w-full py-3 bg-red-50 text-red-600 font-bold rounded-2xl transition-all flex justify-center items-center gap-2 border border-red-100 hover:bg-red-100">
+                  className="w-full py-4 bg-red-50 text-red-600 font-bold rounded-2xl transition-all flex justify-center items-center gap-2 border border-red-100 hover:bg-red-100 hover:shadow-sm active:scale-95">
                   <WifiOff className="w-5 h-5" /> التوقف مؤقتاً
                 </button>
               </div>
@@ -407,7 +437,7 @@ const DriverDashboard = () => {
                 <h2 className="text-lg font-bold text-gray-900 mb-1">التطبيق متوقف</h2>
                 <p className="text-gray-500 text-sm mb-5">شغّل الاتصال لتبدأ مسح الخريطة وقبول الطلبات</p>
                 <button onClick={() => setIsOnline(true)}
-                  className="w-full bg-gray-900 text-white flex items-center justify-center gap-3 py-4 rounded-2xl font-black shadow-lg">
+                  className="w-full bg-gray-900 hover:bg-black text-white flex items-center justify-center gap-3 py-4 rounded-2xl font-black shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:scale-95">
                   <CheckCircle2 className="w-6 h-6" /> تشغيل النظام والبدء
                 </button>
               </div>
@@ -415,12 +445,21 @@ const DriverDashboard = () => {
           </div>
         </div>
 
-        {/* Logout */}
-        <button
-          onClick={() => { localStorage.removeItem('tiaret_driver_phone'); setIsLoggedIn(false); setPhone(''); setDriverData(undefined); }}
-          className="mt-6 mb-2 pointer-events-auto text-gray-400 text-xs text-center font-bold hover:text-gray-600 transition-colors bg-white/50 py-2 rounded-full mx-auto px-6">
-          تسجيل خروج
-        </button>
+        {/* Footer Actions */}
+        <div className="mt-4 flex flex-col items-center gap-2 pointer-events-auto">
+          {!activeOrder && (
+            <button
+              onClick={() => navigate('/')}
+              className="w-full flex justify-center items-center gap-2 bg-white/80 hover:bg-white text-gray-700 font-bold py-3 rounded-2xl shadow-sm border border-gray-100 transition-all">
+              العودة للرئيسية 🏠
+            </button>
+          )}
+          <button
+            onClick={() => { localStorage.removeItem('tiaret_driver_phone'); setIsLoggedIn(false); setPhone(''); setDriverData(undefined); }}
+            className="text-gray-400 text-xs font-bold hover:text-gray-600 transition-colors py-2 px-6">
+            تسجيل خروج
+          </button>
+        </div>
       </div>
 
       {/* ── INCOMING ORDER POPUP ── */}

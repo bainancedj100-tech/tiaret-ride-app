@@ -70,8 +70,8 @@ const AdminDashboard = () => {
   };
 
   // ── Driver Actions ──
-  const setDriverStatus = async (phone, status) => {
-    await updateDoc(doc(db, 'drivers', phone), { status });
+  const setDriverStatus = async (driverId, status) => {
+    await updateDoc(doc(db, 'drivers', driverId), { status });
   };
 
   const deleteOrder = async (orderId) => {
@@ -87,20 +87,20 @@ const AdminDashboard = () => {
   const startEdit = (driver) => {
     setEditState(prev => ({
       ...prev,
-      [driver.phone]: { balance: driver.balance || 0, freeTrips: driver.freeTrips ?? 3 }
+      [driver.id]: { balance: driver.balance || 0, freeTrips: driver.freeTrips ?? 3 }
     }));
   };
 
-  const saveEdit = async (phone) => {
-    const ed = editState[phone];
+  const saveEdit = async (driverId) => {
+    const ed = editState[driverId];
     if (!ed) return;
-    setSaving(prev => ({ ...prev, [phone]: true }));
-    await updateDoc(doc(db, 'drivers', phone), {
+    setSaving(prev => ({ ...prev, [driverId]: true }));
+    await updateDoc(doc(db, 'drivers', driverId), {
       balance: Number(ed.balance),
       freeTrips: Number(ed.freeTrips),
     });
-    setSaving(prev => ({ ...prev, [phone]: false }));
-    setEditState(prev => { const n = { ...prev }; delete n[phone]; return n; });
+    setSaving(prev => ({ ...prev, [driverId]: false }));
+    setEditState(prev => { const n = { ...prev }; delete n[driverId]; return n; });
   };
 
   // ── Computed ──
@@ -241,11 +241,11 @@ const AdminDashboard = () => {
 
                   {/* Action Buttons */}
                   <div className="flex flex-col gap-2 min-w-[130px]">
-                    <button onClick={() => setDriverStatus(driver.phone, 'active')}
+                    <button onClick={() => setDriverStatus(driver.id, 'active')}
                       className="flex items-center justify-center gap-1.5 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-sm">
                       <UserCheck className="w-4 h-4" /> تفعيل
                     </button>
-                    <button onClick={() => setDriverStatus(driver.phone, 'banned')}
+                    <button onClick={() => setDriverStatus(driver.id, 'banned')}
                       className="flex items-center justify-center gap-1.5 bg-red-100 hover:bg-red-200 text-red-700 px-4 py-2 rounded-xl font-bold text-sm transition-all">
                       <Ban className="w-4 h-4" /> رفض
                     </button>
@@ -294,9 +294,9 @@ const AdminDashboard = () => {
                 <p className="text-gray-500 font-semibold">لا يوجد سائقون مسجلون</p>
               </div>
             ) : drivers.map(driver => {
-              const isEditing = !!editState[driver.phone];
-              const ed = editState[driver.phone] || {};
-              const isSaving = saving[driver.phone];
+              const isEditing = !!editState[driver.id];
+              const ed = editState[driver.id] || {};
+              const isSaving = saving[driver.id];
 
               return (
                 <div key={driver.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm">
@@ -321,17 +321,17 @@ const AdminDashboard = () => {
                           <div className="flex items-center gap-1">
                             <span className="text-xs text-gray-500 font-bold">رصيد:</span>
                             <input type="number" value={ed.balance}
-                              onChange={e => setEditState(prev => ({ ...prev, [driver.phone]: { ...prev[driver.phone], balance: e.target.value }}))}
+                              onChange={e => setEditState(prev => ({ ...prev, [driver.id]: { ...prev[driver.id], balance: e.target.value }}))}
                               className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-sm font-bold outline-none focus:border-brand" />
                             <span className="text-xs text-gray-400">دج</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <span className="text-xs text-gray-500 font-bold">مجانية:</span>
                             <input type="number" value={ed.freeTrips} min={0} max={99}
-                              onChange={e => setEditState(prev => ({ ...prev, [driver.phone]: { ...prev[driver.phone], freeTrips: e.target.value }}))}
+                              onChange={e => setEditState(prev => ({ ...prev, [driver.id]: { ...prev[driver.id], freeTrips: e.target.value }}))}
                               className="w-14 px-2 py-1 border border-gray-300 rounded-lg text-sm font-bold outline-none focus:border-brand" />
                           </div>
-                          <button onClick={() => saveEdit(driver.phone)} disabled={isSaving}
+                          <button onClick={() => saveEdit(driver.id)} disabled={isSaving}
                             className="flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-xl text-sm font-bold transition-all">
                             {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                             حفظ
@@ -355,11 +355,11 @@ const AdminDashboard = () => {
                       {/* Activate / Ban toggle */}
                       {driver.status !== 'pending' && (
                         driver.status === 'active'
-                          ? <button onClick={() => setDriverStatus(driver.phone, 'banned')}
+                          ? <button onClick={() => setDriverStatus(driver.id, 'banned')}
                               className="flex items-center gap-1 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-xl text-sm font-bold transition-all">
                               <Ban className="w-3 h-3" /> حظر
                             </button>
-                          : <button onClick={() => setDriverStatus(driver.phone, 'active')}
+                          : <button onClick={() => setDriverStatus(driver.id, 'active')}
                               className="flex items-center gap-1 bg-green-50 hover:bg-green-100 text-green-700 px-3 py-1.5 rounded-xl text-sm font-bold transition-all">
                               <UserCheck className="w-3 h-3" /> تفعيل
                             </button>
@@ -367,7 +367,7 @@ const AdminDashboard = () => {
 
                       {/* Activate from pending */}
                       {driver.status === 'pending' && (
-                        <button onClick={() => setDriverStatus(driver.phone, 'active')}
+                        <button onClick={() => setDriverStatus(driver.id, 'active')}
                           className="flex items-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-1.5 rounded-xl text-sm font-bold transition-all">
                           <UserCheck className="w-3 h-3" /> اعتماد
                         </button>

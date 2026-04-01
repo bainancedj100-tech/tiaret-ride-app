@@ -4,5 +4,6 @@
     <string name="title_activity_main">tiaret-ride-app</string>
     <string name="package_name">com.tiaretride.app</string>
     <string name="custom_url_scheme">com.tiaretride.app</string>
-    <string name="google_client_id">774444004936-xxxxxxxx.apps.googleusercontent.com</string>
+    <string name="google_client_id">774444004936-f9m97kl01mu8ctordhq2444ju96bl5pm.apps.googleusercontent.com</string>
+    <string name="server_client_id">774444004936-f9m97kl01mu8ctordhq2444ju96bl5pm.apps.googleusercontent.com</string>
 </resources>

@@ -1,0 +1,34 @@
+{
+  "project_info": {
+    "project_number": "774444004936",
+    "project_id": "tiaret-ride-app",
+    "storage_bucket": "tiaret-ride-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:774444004936:android:b8158f1ec5e8c412d68a7d",
+        "android_client_info": {
+          "package_name": "com.tiaretride.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "774444004936-f9m97kl01mu8ctordhq2444ju96bl5pm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD0i9nDzGoCFc8qm7Z2u9GJ8pk9t1GmZFA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

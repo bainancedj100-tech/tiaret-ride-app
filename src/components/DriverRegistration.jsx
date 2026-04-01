@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db, auth } from '../firebase/config';
 import { uploadDriverDocument } from '../services/storage';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -110,8 +110,9 @@ const DriverRegistration = () => {
       ]);
 
       setLoadingMsg('جاري حفظ الملف وإعداد حسابك ⚙️...');
-      // Save as 'pending' in drivers collection
-      await setDoc(doc(db, 'drivers', form.phone), {
+      // Save as 'pending' in drivers collection using UID so AuthGate can find it
+      const currentUid = auth.currentUser ? auth.currentUser.uid : form.phone;
+      await setDoc(doc(db, 'drivers', currentUid), {
         firstName: form.firstName,
         lastName: form.lastName,
         phone: form.phone,
@@ -161,9 +162,12 @@ const DriverRegistration = () => {
             <p className="text-amber-300 text-sm font-bold">⏳ حالة الحساب: قيد المراجعة</p>
             <p className="text-white/50 text-xs mt-1">يرجى التواصل مع الإدارة عبر واتساب لتفعيل حسابك</p>
           </div>
-          <a href="https://wa.me/213658592909" target="_blank" rel="noreferrer" className="btn-primary w-full flex items-center justify-center gap-2">
+          <a href="https://wa.me/213658592909" target="_blank" rel="noreferrer" className="btn-primary w-full flex items-center justify-center gap-2 mb-3">
             تواصل عبر واتساب <MessageCircle className="w-5 h-5" />
           </a>
+          <button onClick={() => navigate('/driver/dashboard')} className="btn-ghost w-full">
+            متابعة حالة الطلب / الدخول كسائق
+          </button>
         </div>
       </div>
     );

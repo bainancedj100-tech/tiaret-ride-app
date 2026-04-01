@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Car, Package, MapPin, Navigation, Loader2, Star, X } from 'lucide-react';
+import { Car, Package, MapPin, Navigation, Loader2, Star, X, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Map from './Map';
 import { calculatePrice, calculateDistanceKm, TIARET_CENTER } from '../utils/pricing';
@@ -20,6 +20,9 @@ const RiderHome = () => {
   const [rating, setRating] = useState(0);
   const [radius, setRadius] = useState(0.5); // Starts at 0.5 km
   const [assignedDriverLoc, setAssignedDriverLoc] = useState(null);
+  const [initialDriverLoc, setInitialDriverLoc] = useState(null);
+  const [rideState, setRideState] = useState(null);
+  const [orderData, setOrderData] = useState(null);
   const driverUnsubRef = useRef(null);
 
   const [errorMsg, setErrorMsg] = useState(null);
@@ -67,9 +70,23 @@ const RiderHome = () => {
     if (!destination) return;
     setFlow('finding');
     setErrorMsg(null);
+    
+    let orderOrigin = TIARET_CENTER;
+    try {
+      if (navigator.geolocation) {
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000 });
+        });
+        orderOrigin = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      }
+    } catch (e) {
+      console.warn("Could not get exact GPS origin, using default.");
+    }
+
     try {
       const ref = await addDoc(collection(db, 'orders'), {
         serviceType,
+        origin: orderOrigin,
         destination,
         price,
         status: 'finding',
@@ -82,9 +99,15 @@ const RiderHome = () => {
         const data = snap.data();
         if (data.status === 'active') { 
           setFlow('active');
+          setOrderData(data);
+          setRideState(data.rideState);
           if (data.driverId && !driverUnsubRef.current) {
             driverUnsubRef.current = onSnapshot(doc(db, 'drivers_location', data.driverId), dSnap => {
-              if (dSnap.exists() && dSnap.data().location) setAssignedDriverLoc(dSnap.data().location);
+              if (dSnap.exists() && dSnap.data().location) {
+                const loc = dSnap.data().location;
+                setAssignedDriverLoc(loc);
+                setInitialDriverLoc(prev => prev ? prev : loc); // Track driver initial location
+              }
             });
           }
         }
@@ -108,7 +131,20 @@ const RiderHome = () => {
     setCurrentOrderId(null);
     setRating(0);
     setAssignedDriverLoc(null);
+    setInitialDriverLoc(null);
     clearDriverUnsub();
+  };
+
+  const handleCancelRequest = async () => {
+    if (currentOrderId) {
+      try {
+        const { updateDoc, doc } = await import('firebase/firestore');
+        await updateDoc(doc(db, 'orders', currentOrderId), { status: 'cancelled' });
+        setInitialDriverLoc(null);
+      } catch (err) {
+         console.error(err);
+      }
+    }
   };
 
   return (
@@ -120,6 +156,8 @@ const RiderHome = () => {
         radius={radius}
         assignedDriverLoc={assignedDriverLoc}
         showCircle={flow === 'finding'}
+        routeOrigin={flow === 'active' && orderData ? (rideState === 'going_to_customer' && initialDriverLoc ? initialDriverLoc : orderData.origin) : null}
+        routeDestination={flow === 'active' && orderData ? (rideState === 'going_to_customer' ? orderData.origin : orderData.destination) : null}
       />
 
       {errorMsg && flow === 'idle' && (
@@ -133,12 +171,28 @@ const RiderHome = () => {
 
       {/* ── TOP NAV (idle only) ── */}
       {flow === 'idle' && (
-        <div className="absolute top-4 right-4 left-4 z-20 flex items-center justify-end">
+        <div className="absolute top-4 right-4 left-4 z-20 flex items-center justify-between">
+          {destination ? (
+            <button
+              onClick={() => { setDestination(null); setPrice(0); }}
+              className="glass-light px-5 py-2.5 rounded-full text-gray-700 font-bold text-sm shadow-xl flex items-center gap-2 transition-all hover:bg-white active:scale-95 border border-gray-100"
+            >
+              <X className="w-5 h-5 text-gray-400" /> الرجوع
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/profile')}
+              className="glass-light w-12 h-12 rounded-full flex items-center justify-center text-gray-700 shadow-xl transition-all hover:bg-white active:scale-95 border border-gray-100"
+            >
+              <User className="w-6 h-6" />
+            </button>
+          )}
+          
           <button
-            onClick={() => navigate('/driver/register')}
-            className="glass-light px-4 py-2 rounded-full text-gray-700 font-bold text-sm shadow-lg flex items-center gap-1.5"
+            onClick={() => navigate('/driver/dashboard')}
+            className="glass-light px-5 py-2.5 rounded-full text-gray-700 font-bold text-sm shadow-xl flex items-center gap-2 transition-all hover:bg-white active:scale-95 border border-gray-100"
           >
-            سجّل كسائق <Car className="w-4 h-4 text-brand" />
+            دخول كسائق <Car className="w-5 h-5 text-brand" />
           </button>
         </div>
       )}
@@ -171,12 +225,8 @@ const RiderHome = () => {
                   <div>
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">السعر المقدر</p>
                     <p className="text-3xl font-black text-gray-900">{price} <span className="text-lg text-gray-500">دج</span></p>
-                    <p className="text-xs text-gray-400 mt-0.5">المسافة: {distance} كم</p>
+                    <p className="text-xs text-gray-400 mt-1 font-bold">المسافة: {distance} كم</p>
                   </div>
-                  <button onClick={() => { setDestination(null); setPrice(0); }}
-                    className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center">
-                    <X className="w-4 h-4 text-gray-600" />
-                  </button>
                 </div>
 
                 {/* Service toggle */}
@@ -223,7 +273,10 @@ const RiderHome = () => {
               </div>
             </div>
             <h2 className="text-2xl font-black text-gray-900 mb-2">جارٍ البحث عن سائق...</h2>
-            <p className="text-gray-500 font-medium">نتصل بأقرب السائقين في تيارت</p>
+            <p className="text-gray-500 font-medium mb-6">نتصل بأقرب السائقين في تيارت</p>
+            <button onClick={handleCancelRequest} className="w-full py-4 bg-red-50 text-red-600 font-black rounded-2xl border border-red-100 hover:bg-red-100 transition-all active:scale-95">
+              إلغاء الطلب ✕
+            </button>
           </div>
         </div>
       )}
@@ -243,12 +296,14 @@ const RiderHome = () => {
               </div>
             </div>
             <div className="bg-green-50 border border-green-200 rounded-2xl p-3 mb-5 flex items-center justify-between">
-              <span className="text-green-700 font-bold text-sm">🕐 في الطريق إليك — حوالي 4 دقائق</span>
+              <span className="text-green-700 font-bold text-sm">
+                {rideState === 'going_to_customer' ? '🕐 السائق في الطريق إليك' : '📍 السائق متوجه بك إلى الوجهة'}
+              </span>
               <span className="text-green-600 font-black">{price} دج</span>
             </div>
-            <button onClick={() => setFlow('invoice')}
-              className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl shadow-lg transition-all active:scale-95">
-              تأكيد إتمام الرحلة ✓
+            <button onClick={handleCancelRequest}
+              className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-black py-4 rounded-2xl shadow-sm transition-all active:scale-95 border border-red-200 flex items-center justify-center gap-2">
+              إلغاء الرحلة <X className="w-5 h-5" />
             </button>
           </div>
         </div>
